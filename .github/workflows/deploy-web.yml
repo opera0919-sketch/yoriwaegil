@@ -30,9 +30,8 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
 
-      - name: Prepare web/src/recipe-box.jsx for Vite
-        run: |
-          sed 's|from "https://esm.sh/@supabase/supabase-js@2"|from "@supabase/supabase-js"|g' recipe-box.jsx > web/src/recipe-box.jsx
+      - name: Copy recipe-box.jsx into web/src
+        run: cp recipe-box.jsx web/src/recipe-box.jsx
 
       - name: Install dependencies
         working-directory: web

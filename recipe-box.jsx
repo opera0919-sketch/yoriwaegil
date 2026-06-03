@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   Search, Plus, Clock, Check, ShoppingCart, Star, Trash2, X, Play, Pause,
   RotateCcw, ChefHat, Sparkles, Minus, Loader2, Flame, ChevronRight,
@@ -254,10 +253,30 @@ const DEFAULT_USER_ID = "user_chaeyuna";
 const DEFAULT_USER = { id: DEFAULT_USER_ID, name: "채유나", emoji: "🧑‍🍳", color: "#3182F6" };
 const USER_COLORS = ["#3182F6","#F04452","#00B493","#F8971D","#8B5CF6","#EC4899","#14B8A6","#F59E0B"];
 
-/* Supabase */
+/* Supabase REST API (no SDK — works in all environments) */
 const SUPABASE_URL = "https://fbkriifozbwuaoegmmcf.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZia3JpaWZvemJ3dWFvZWdtbWNmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0NTk4MTYsImV4cCI6MjA5NjAzNTgxNn0.YGktdDGIYXVvIqdSrmhkG8um-zjZtHoRhWG4EQV60HU";
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const SB_HEADERS = {
+  apikey: SUPABASE_ANON_KEY,
+  Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+  "Content-Type": "application/json",
+};
+const sbFetch = (path, opts = {}) =>
+  fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    ...opts,
+    headers: { ...SB_HEADERS, ...(opts.headers || {}) },
+  });
+const db = {
+  select: (table) => sbFetch(table).then((r) => r.json()),
+  insert: (table, data) =>
+    sbFetch(table, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify(data) }),
+  upsert: (table, data) =>
+    sbFetch(table, { method: "POST", headers: { Prefer: "resolution=ignore-duplicates,return=minimal" }, body: JSON.stringify(data) }),
+  update: (table, patch, id) =>
+    sbFetch(`${table}?id=eq.${id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(patch) }),
+  del: (table, id) =>
+    sbFetch(`${table}?id=eq.${id}`, { method: "DELETE" }),
+};
 
 /* localStorage — currentUserId만 탭별로 유지 */
 const localStore = {
@@ -636,79 +655,53 @@ export default function RecipeBox() {
 
   const [dbError, setDbError] = useState(null);
 
-  /* load from Supabase (migrate from localStorage if DB is empty) */
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      /* ── users ── */
-      const { data: dbUsers, error: usersErr } = await supabase.from("app_users").select("*");
-      if (cancelled) return;
-      if (usersErr) { setDbError(usersErr.message); setLoaded(true); return; }
+  /* load from Supabase */
+  const loadFromDb = async () => {
+    try {
+      const dbUsers = await db.select("app_users");
       let resolvedUsers;
-      if (!dbUsers || !dbUsers.length) {
+      if (!Array.isArray(dbUsers) || !dbUsers.length) {
         const localUsers = (() => { try { const v = localStorage.getItem("recipebox:v1:users"); return v ? JSON.parse(v) : null; } catch { return null; } })();
         resolvedUsers = (localUsers && localUsers.length) ? localUsers : [DEFAULT_USER];
-        const { error: insErr } = await supabase.from("app_users").upsert(resolvedUsers, { onConflict: "id", ignoreDuplicates: true });
-        if (cancelled) return;
-        if (insErr) { setDbError(insErr.message); setLoaded(true); return; }
+        await db.upsert("app_users", resolvedUsers);
       } else {
         resolvedUsers = dbUsers;
       }
 
-      /* ── currentUser (tab-local) ── */
       const resolvedCurUser = localStore.loadCurrentUser() || DEFAULT_USER_ID;
 
-      /* ── recipes ── */
-      const { data: dbRecipes, error: recipesErr } = await supabase.from("recipes").select("*");
-      if (cancelled) return;
-      if (recipesErr) { setDbError(recipesErr.message); setLoaded(true); return; }
+      const dbRecipes = await db.select("recipes");
       let rawRecipes;
-      if (!dbRecipes || !dbRecipes.length) {
+      if (!Array.isArray(dbRecipes) || !dbRecipes.length) {
         const localData = (() => { try { const v = localStorage.getItem("recipebox:v1:recipes"); return v ? JSON.parse(v) : null; } catch { return null; } })();
-        if (localData && localData.length) {
-          rawRecipes = migrateRecipes(localData, resolvedCurUser);
-        } else {
-          rawRecipes = seed();
-        }
-        const { error: seedErr } = await supabase.from("recipes").upsert(rawRecipes.map(toRow), { onConflict: "id", ignoreDuplicates: true });
-        if (cancelled) return;
-        if (seedErr) { setDbError(seedErr.message); setLoaded(true); return; }
+        rawRecipes = (localData && localData.length) ? migrateRecipes(localData, resolvedCurUser) : seed();
+        await db.upsert("recipes", rawRecipes.map(toRow));
       } else {
         rawRecipes = dbRecipes.map(fromRow);
       }
 
-      setUsers(resolvedUsers);
-      setCurrentUserId(resolvedCurUser);
-      setRecipes(rawRecipes);
-      setLoaded(true);
+      return { resolvedUsers, resolvedCurUser, rawRecipes };
+    } catch (e) {
+      throw new Error(e.message || "DB 연결 실패");
+    }
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { resolvedUsers, resolvedCurUser, rawRecipes } = await loadFromDb();
+        if (cancelled) return;
+        setUsers(resolvedUsers);
+        setCurrentUserId(resolvedCurUser);
+        setRecipes(rawRecipes);
+      } catch (e) {
+        if (!cancelled) setDbError(e.message);
+      } finally {
+        if (!cancelled) setLoaded(true);
+      }
     })();
     return () => { cancelled = true; };
-  }, []);
-
-  /* Supabase Realtime — 다른 기기/탭의 변경을 실시간 반영 */
-  useEffect(() => {
-    const ch = supabase
-      .channel("recipebox-realtime")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "recipes" }, ({ new: row }) => {
-        setRecipes((r) => r.some((x) => x.id === row.id) ? r : [fromRow(row), ...r]);
-      })
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "recipes" }, ({ new: row }) => {
-        setRecipes((r) => r.map((x) => x.id === row.id ? fromRow(row) : x));
-      })
-      .on("postgres_changes", { event: "DELETE", schema: "public", table: "recipes" }, ({ old: row }) => {
-        setRecipes((r) => r.filter((x) => x.id !== row.id));
-      })
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "app_users" }, ({ new: row }) => {
-        setUsers((u) => u.some((x) => x.id === row.id) ? u : [...u, row]);
-      })
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "app_users" }, ({ new: row }) => {
-        setUsers((u) => u.map((x) => x.id === row.id ? row : x));
-      })
-      .on("postgres_changes", { event: "DELETE", schema: "public", table: "app_users" }, ({ old: row }) => {
-        setUsers((u) => u.filter((x) => x.id !== row.id));
-      })
-      .subscribe();
-    return () => supabase.removeChannel(ch);
   }, []);
 
   /* currentUserId는 탭별로 localStorage에만 저장 */
@@ -739,12 +732,12 @@ export default function RecipeBox() {
   /* helpers */
   const update = (id, patch) => {
     setRecipes((r) => r.map((x) => (x.id === id ? { ...x, ...patch } : x)));
-    supabase.from("recipes").update(patchToRow(patch)).eq("id", id);
+    db.update("recipes", patchToRow(patch), id);
   };
   const remove = (id) => {
     setRecipes((r) => r.filter((x) => x.id !== id));
     setDetailId(null);
-    supabase.from("recipes").delete().eq("id", id);
+    db.del("recipes", id);
   };
   const addRecipe = (r) => {
     const recipe = {
@@ -753,16 +746,16 @@ export default function RecipeBox() {
       favorites: [], inCartBy: [], notes: {}, cookLogs: [],
     };
     setRecipes((prev) => [recipe, ...prev]);
-    supabase.from("recipes").insert(toRow(recipe));
+    db.insert("recipes", toRow(recipe));
   };
   const addUser = (user) => {
     setUsers((u) => [...u, user]);
     setCurrentUserId(user.id);
-    supabase.from("app_users").insert(user);
+    db.insert("app_users", user);
   };
   const editUser = (id, patch) => {
     setUsers((u) => u.map((x) => (x.id === id ? { ...x, ...patch } : x)));
-    supabase.from("app_users").update(patch).eq("id", id);
+    db.update("app_users", patch, id);
   };
   const deleteUser = (id) => {
     setUsers((prev) => {
@@ -770,7 +763,20 @@ export default function RecipeBox() {
       if (id === currentUserId) setCurrentUserId(next[0]?.id || DEFAULT_USER_ID);
       return next;
     });
-    supabase.from("app_users").delete().eq("id", id);
+    db.del("app_users", id);
+  };
+  const refresh = async () => {
+    setLoaded(false);
+    try {
+      const { resolvedUsers, resolvedCurUser, rawRecipes } = await loadFromDb();
+      setUsers(resolvedUsers);
+      setCurrentUserId(resolvedCurUser);
+      setRecipes(rawRecipes);
+    } catch (e) {
+      setDbError(e.message);
+    } finally {
+      setLoaded(true);
+    }
   };
 
   const startTimer = (key, total) =>
@@ -885,10 +891,15 @@ export default function RecipeBox() {
             <b>{currentUser.name}</b>
             <ChevronDown size={14} color="#8B95A1" />
           </div>
-          <div className="rb-stats">
-            <div className="rb-stat"><b>{recipes.length}</b><span>저장한 레시피</span></div>
-            <div className="rb-stat"><b>{triedCount}</b><span>만들어 본 요리</span></div>
-            <div className="rb-stat"><b>{cartRecipes.length}</b><span>장보기 담음</span></div>
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <div className="rb-stats">
+              <div className="rb-stat"><b>{recipes.length}</b><span>저장한 레시피</span></div>
+              <div className="rb-stat"><b>{triedCount}</b><span>만들어 본 요리</span></div>
+              <div className="rb-stat"><b>{cartRecipes.length}</b><span>장보기 담음</span></div>
+            </div>
+            <div className="rb-ico" title="새로고침" onClick={refresh}>
+              <RotateCcw size={16} />
+            </div>
           </div>
         </header>
 
