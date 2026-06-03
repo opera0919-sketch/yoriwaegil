@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   Search, Plus, Clock, Check, ShoppingCart, Star, Trash2, X, Play, Pause,
   RotateCcw, ChefHat, Sparkles, Minus, Loader2, Flame, ChevronRight,

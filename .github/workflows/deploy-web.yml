@@ -31,7 +31,9 @@ jobs:
           cache-dependency-path: web/package-lock.json
 
       - name: Sync recipe-box.jsx into web/src
-        run: cp recipe-box.jsx web/src/recipe-box.jsx
+        run: |
+          cp recipe-box.jsx web/src/recipe-box.jsx
+          sed -i 's|from "https://esm.sh/@supabase/supabase-js@2"|from "@supabase/supabase-js"|g' web/src/recipe-box.jsx
 
       - name: Install dependencies
         working-directory: web
