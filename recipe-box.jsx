@@ -4,6 +4,7 @@ import {
   Search, Plus, Clock, Check, ShoppingCart, Star, Trash2, X, Play, Pause,
   RotateCcw, ChefHat, Sparkles, Minus, Loader2, Flame, ChevronRight,
   ChevronLeft, Copy, ListChecks, Utensils, Bookmark, Pencil, ChevronDown,
+  MessageCircle, Send, Link2,
 } from "lucide-react";
 
 /* ------------------------------------------------------------------ */
@@ -234,6 +235,37 @@ const CSS = `
   background:#F9FAFB; font-size:22px; cursor:pointer; display:grid; place-items:center; transition:.15s; }
 .rb-emoji-btn:hover,.rb-emoji-btn.on { border-color:var(--accent); background:#EBF2FF; }
 
+/* select custom arrow (테두리 톤에 맞춘 회색) */
+.rb-sel { appearance:none; -webkit-appearance:none; -moz-appearance:none; padding-right:34px;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%238B95A1' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+  background-repeat:no-repeat; background-position:right 12px center; cursor:pointer; }
+.rb-sel:focus { background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%233182F6' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+  background-repeat:no-repeat; background-position:right 12px center; }
+
+/* comments */
+.rb-comment { display:flex; gap:10px; align-items:flex-start; padding:11px 0; border-bottom:1px solid var(--line); }
+.rb-comment:last-child { border-bottom:none; }
+.rb-comment-body { flex:1; min-width:0; }
+.rb-comment-head { display:flex; align-items:center; gap:7px; margin-bottom:3px; }
+.rb-comment-name { font-size:12.5px; font-weight:700; }
+.rb-comment-date { font-size:11px; color:var(--soft); }
+.rb-comment-text { font-size:13.5px; line-height:1.55; white-space:pre-wrap; word-break:break-word; }
+.rb-comment-del { font-size:11px; color:var(--soft); cursor:pointer; flex:none; }
+.rb-comment-del:hover { color:var(--danger); }
+
+/* shopping recipe rows */
+.rb-shop-recipe { display:flex; align-items:center; gap:10px; padding:11px 13px; border-radius:12px;
+  background:var(--card); margin-bottom:8px; box-shadow:0 1px 6px rgba(0,0,0,.05); }
+.rb-shop-recipe .nm { flex:1; min-width:0; font-size:14px; font-weight:600; cursor:pointer;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.rb-shop-recipe .nm:hover { color:var(--accent); }
+
+/* citation */
+.rb-citation { display:inline-flex; align-items:center; gap:5px; margin-top:7px; font-size:12px;
+  color:var(--accent); text-decoration:none; max-width:100%; }
+.rb-citation:hover { text-decoration:underline; }
+.rb-citation span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
 @keyframes rb-up { from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:none;} }
 @keyframes rb-up-sheet { from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:none;} }
 @keyframes rb-fade { from{opacity:0;}to{opacity:1;} }
@@ -282,7 +314,10 @@ const toRow = (r) => ({
   favorites: r.favorites || [],
   in_cart_by: r.inCartBy || [],
   notes: r.notes || {},
+  comments: r.comments || [],
   cook_logs: r.cookLogs || [],
+  source_url: r.sourceUrl || "",
+  source_title: r.sourceTitle || "",
   version: r.version || 1,
 });
 
@@ -302,7 +337,11 @@ const fromRow = (row) => ({
   favorites: row.favorites || [],
   inCartBy: row.in_cart_by || [],
   notes: row.notes || {},
+  comments: row.comments || [],
   cookLogs: row.cook_logs || [],
+  sourceUrl: row.source_url || "",
+  sourceTitle: row.source_title || "",
+  createdAt: row.created_at ? new Date(row.created_at).getTime() : 0,
   version: row.version || 1,
 });
 
@@ -314,6 +353,8 @@ const PATCH_MAP = {
   updatedBy: "updated_by",
   inCartBy: "in_cart_by",
   cookLogs: "cook_logs",
+  sourceUrl: "source_url",
+  sourceTitle: "source_title",
 };
 const patchToRow = (patch) =>
   Object.fromEntries(Object.entries(patch).map(([k, v]) => [PATCH_MAP[k] || k, v]));
@@ -750,7 +791,8 @@ export default function RecipeBox() {
     const recipe = {
       ...r, id: uid(),
       createdBy: currentUserId, updatedBy: currentUserId,
-      favorites: [], inCartBy: [], notes: {}, cookLogs: [],
+      favorites: [], inCartBy: [], notes: {}, comments: [], cookLogs: [],
+      createdAt: Date.now(),
     };
     setRecipes((prev) => [recipe, ...prev]);
     supabase.from("recipes").insert(toRow(recipe));
@@ -817,6 +859,8 @@ export default function RecipeBox() {
         const lb = b.cookLogs?.find((l) => l.userId === currentUserId)?.lastCookedAt || 0;
         return lb - la;
       });
+    } else if (sort === "created") {
+      list = [...list].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
     } else if (sort === "name") {
       list = [...list].sort((a, b) => a.title.localeCompare(b.title, "ko"));
     }
@@ -825,23 +869,6 @@ export default function RecipeBox() {
 
   const cartRecipes = recipes.filter((r) => r.inCartBy?.includes(currentUserId));
   const triedCount = recipes.filter((r) => r.cookLogs?.some((l) => l.userId === currentUserId && l.count > 0)).length;
-
-  const shopList = useMemo(() => {
-    const map = {};
-    cartRecipes.forEach((r) => {
-      r.ingredients.forEach((ing) => {
-        const key = `${ing.name}|${ing.unit}`;
-        if (!map[key]) map[key] = { name: ing.name, unit: ing.unit, group: ing.group || "기타", amount: 0, from: [] };
-        map[key].amount += Number(ing.amount) || 0;
-        if (!map[key].from.includes(r.title)) map[key].from.push(r.title);
-      });
-    });
-    const byGroup = {};
-    Object.entries(map).forEach(([k, v]) => {
-      (byGroup[v.group] = byGroup[v.group] || []).push({ key: k, ...v });
-    });
-    return byGroup;
-  }, [cartRecipes]);
 
   const detail = recipes.find((r) => r.id === detailId);
   const cookRecipe = recipes.find((r) => r.id === cookId);
@@ -895,7 +922,7 @@ export default function RecipeBox() {
         {/* tabs */}
         <div className="rb-tabs">
           <button className={`rb-tab ${tab === "box" ? "on" : ""}`} onClick={() => setTab("box")}>
-            <Bookmark size={15} /> 보관함
+            <Bookmark size={15} /> 저장된 레시피
           </button>
           <button className={`rb-tab ${tab === "cart" ? "on" : ""}`} onClick={() => setTab("cart")}>
             <ShoppingCart size={15} /> 장보기 목록
@@ -906,18 +933,21 @@ export default function RecipeBox() {
         {tab === "box" && (
           <>
             <div className="rb-bar">
-              <div className="rb-search">
+              <div className="rb-search" style={{ flex: "0 1 58%", minWidth: 180 }}>
                 <Search size={17} color="#8B95A1" />
                 <input placeholder="요리 이름, 재료, 태그로 검색…" value={q} onChange={(e) => setQ(e.target.value)} />
                 {q && <X size={16} style={{ cursor: "pointer", color: "#8B95A1" }} onClick={() => setQ("")} />}
               </div>
-              <button className="rb-btn" onClick={() => setFavOnly((v) => !v)}
-                style={favOnly ? { borderColor: "var(--gold)", color: "var(--gold)" } : {}}>
-                <Star size={15} fill={favOnly ? "#F8C83A" : "none"} /> 즐겨찾기
+              <button className="rb-ico" title={favOnly ? "전체 보기" : "즐겨찾기만 보기"}
+                onClick={() => setFavOnly((v) => !v)}
+                style={{ marginLeft: "auto", width: 42, height: 42,
+                  ...(favOnly ? { borderColor: "var(--gold)", color: "var(--gold)", background: "#FFFBE6" } : {}) }}>
+                <Star size={17} fill={favOnly ? "#F8C83A" : "none"} />
               </button>
               <select className="rb-sel" value={sort} onChange={(e) => setSort(e.target.value)}
                 style={{ width: 130, flex: "none" }}>
                 <option value="default">기본순</option>
+                <option value="created">최근 추가순</option>
                 <option value="recent">최근 조리순</option>
                 <option value="name">이름순</option>
               </select>
@@ -978,6 +1008,12 @@ export default function RecipeBox() {
                           </div>
                         </div>
                         <div className="rb-cdesc">{r.description}</div>
+                        {r.sourceUrl && (
+                          <a className="rb-citation" href={r.sourceUrl} target="_blank" rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()} style={{ fontSize: 11, marginTop: 5 }}>
+                            <Link2 size={11} /> <span>출처: {r.sourceTitle || "원문 보기"}</span>
+                          </a>
+                        )}
                         <div className="rb-meta">
                           <span><Clock size={13} /> {r.totalMinutes}분</span>
                           <span><Flame size={13} /> {r.difficulty}</span>
@@ -994,10 +1030,25 @@ export default function RecipeBox() {
                         )}
                       </div>
                       <div className="rb-cfoot" onClick={(e) => e.stopPropagation()}>
-                        <label className="rb-chk" onClick={() => markCookedToggle(r, update, currentUserId)}>
-                          <span className={`rb-box ${tried ? "on" : ""}`}>{tried && <Check size={14} />}</span>
-                          만들어 봄{myLog && myLog.count > 0 ? ` ·${myLog.count}회` : ""}
-                        </label>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                          <label className="rb-chk" onClick={() => markCookedToggle(r, update, currentUserId)}>
+                            <span className={`rb-box ${tried ? "on" : ""}`}>{tried && <Check size={14} />}</span>
+                            만들어 봄
+                          </label>
+                          {tried && (
+                            <div style={{ display: "flex", gap: 1 }} title="별점">
+                              {[1, 2, 3, 4, 5].map((n) => (
+                                <Star key={n} size={15} style={{ cursor: "pointer" }}
+                                  fill={n <= (myLog?.rating || 0) ? "#F8C83A" : "none"}
+                                  color={n <= (myLog?.rating || 0) ? "#F8C83A" : "#D0D5DD"}
+                                  onClick={() => update(r.id, {
+                                    cookLogs: (r.cookLogs || []).map((l) =>
+                                      l.userId === currentUserId ? { ...l, rating: n } : l),
+                                  })} />
+                              ))}
+                            </div>
+                          )}
+                        </div>
                         <div
                           className={`rb-ico ${inCart ? "cart" : ""}`}
                           title="장보기 목록에 담기"
@@ -1019,7 +1070,7 @@ export default function RecipeBox() {
 
         {tab === "cart" && (
           <ShoppingView
-            cartRecipes={cartRecipes} shopList={shopList} checked={checked} setChecked={setChecked}
+            cartRecipes={cartRecipes} checked={checked} setChecked={setChecked}
             onRemove={(id) => {
               const r = recipes.find((x) => x.id === id);
               if (!r) return;
@@ -1104,18 +1155,12 @@ function markCookedToggle(r, update, currentUserId) {
 /* ------------------------------------------------------------------ */
 function Detail({ r, timers, startTimer, pauseTimer, resetTimer, onClose, update, remove, markCooked, onCook, currentUserId, users }) {
   const [servings, setServings] = useState(r.baseServings);
-  const [note, setNote] = useState(r.notes?.[currentUserId] || "");
-  const [editNote, setEditNote] = useState(false);
-  const [showOtherNotes, setShowOtherNotes] = useState(false);
   const [editing, setEditing] = useState(false);
   const factor = servings / r.baseServings;
 
   const isFav = r.favorites?.includes(currentUserId);
   const inCart = r.inCartBy?.includes(currentUserId);
   const myLog = r.cookLogs?.find((l) => l.userId === currentUserId);
-
-  const otherNotes = Object.entries(r.notes || {})
-    .filter(([uid, txt]) => uid !== currentUserId && txt.trim());
 
   const grouped = useMemo(() => {
     const g = {}; r.ingredients.forEach((i) => (g[i.group || "기타"] = g[i.group || "기타"] || []).push(i)); return g;
@@ -1169,9 +1214,14 @@ function Detail({ r, timers, startTimer, pauseTimer, resetTimer, onClose, update
         </div>
 
         <div className="rb-sh-body">
-          <p style={{ color: "var(--soft)", fontSize: 14, lineHeight: 1.6, marginTop: 0 }}>{r.description}</p>
+          <p style={{ color: "var(--soft)", fontSize: 14, lineHeight: 1.6, marginTop: 0, marginBottom: 4 }}>{r.description}</p>
+          {r.sourceUrl && (
+            <a className="rb-citation" href={r.sourceUrl} target="_blank" rel="noopener noreferrer">
+              <Link2 size={13} /> <span>출처: {r.sourceTitle || r.sourceUrl}</span>
+            </a>
+          )}
 
-          <div className="rb-meta" style={{ fontSize: 13 }}>
+          <div className="rb-meta" style={{ fontSize: 13, marginTop: 12 }}>
             <span><Clock size={14} /> 약 {r.totalMinutes}분</span>
             <span><Flame size={14} /> {r.difficulty}</span>
             {myLog && myLog.count > 0 && <span><Check size={14} /> {myLog.count}회 요리함</span>}
@@ -1257,55 +1307,8 @@ function Detail({ r, timers, startTimer, pauseTimer, resetTimer, onClose, update
             );
           })}
 
-          {/* note */}
-          <div className="rb-sec-h"><Pencil size={16} /> 나의 메모</div>
-          {editNote ? (
-            <div>
-              <textarea className="rb-ta" value={note} onChange={(e) => setNote(e.target.value)}
-                placeholder="다음에 만들 때 바꿀 점, 가족 반응 등을 적어두세요." />
-              <button className="rb-btn acc" style={{ marginTop: 8 }}
-                onClick={() => {
-                  update(r.id, { notes: { ...(r.notes || {}), [currentUserId]: note } });
-                  setEditNote(false);
-                }}>저장</button>
-            </div>
-          ) : (
-            <div className="rb-note" onClick={() => setEditNote(true)}
-              style={{ cursor: "text", color: note ? "var(--ink)" : "var(--soft)" }}>
-              {note || "탭하여 메모 추가…"}
-            </div>
-          )}
-
-          {/* other users' notes */}
-          {otherNotes.length > 0 && (
-            <div style={{ marginTop: 10 }}>
-              <button
-                className="rb-btn ghost" style={{ padding: "6px 0", fontSize: 12.5, color: "var(--soft)" }}
-                onClick={() => setShowOtherNotes((x) => !x)}
-              >
-                <ChevronDown size={14} style={{ transform: showOtherNotes ? "rotate(180deg)" : "none", transition: ".2s" }} />
-                다른 사용자 메모 {otherNotes.length}개
-              </button>
-              {showOtherNotes && (
-                <div className="rb-other-notes">
-                  {otherNotes.map(([uid, txt]) => {
-                    const u = users.find((x) => x.id === uid);
-                    return (
-                      <div key={uid} className="rb-other-note-item">
-                        <UserAvatar user={u || { emoji: "🧑" }} size={28} />
-                        <div>
-                          <div style={{ fontSize: 11, color: "var(--soft)", marginBottom: 3 }}>
-                            {u?.name || "알 수 없음"}
-                          </div>
-                          <div style={{ fontSize: 13.5, lineHeight: 1.55 }}>{txt}</div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
+          {/* comments */}
+          <CommentSection r={r} users={users} currentUserId={currentUserId} update={update} />
 
           <div style={{ marginTop: 26, textAlign: "right" }}>
             <button className="rb-btn ghost" style={{ color: "var(--danger)" }}
@@ -1316,6 +1319,70 @@ function Detail({ r, timers, startTimer, pauseTimer, resetTimer, onClose, update
         </div>
       </div>
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  COMMENT SECTION                                                    */
+/* ------------------------------------------------------------------ */
+function CommentSection({ r, users, currentUserId, update }) {
+  const [text, setText] = useState("");
+  const comments = r.comments || [];
+
+  const addComment = () => {
+    const t = text.trim();
+    if (!t) return;
+    const next = [...comments, { id: uid(), userId: currentUserId, text: t, createdAt: Date.now() }];
+    update(r.id, { comments: next });
+    setText("");
+  };
+  const delComment = (cid) => {
+    update(r.id, { comments: comments.filter((c) => c.id !== cid) });
+  };
+
+  return (
+    <>
+      <div className="rb-sec-h"><MessageCircle size={16} /> 댓글
+        {comments.length > 0 && <span style={{ color: "var(--soft)", fontWeight: 400, fontSize: 13 }}>{comments.length}</span>}
+      </div>
+
+      {comments.length === 0 ? (
+        <div style={{ color: "var(--soft)", fontSize: 13, padding: "4px 0 10px" }}>
+          첫 댓글을 남겨보세요. 만들어 본 후기, 간 조절, 가족 반응 등을 공유할 수 있어요.
+        </div>
+      ) : (
+        <div style={{ marginBottom: 6 }}>
+          {comments.slice().sort((a, b) => a.createdAt - b.createdAt).map((c) => {
+            const u = users.find((x) => x.id === c.userId);
+            return (
+              <div key={c.id} className="rb-comment">
+                <UserAvatar user={u || { emoji: "🧑" }} size={30} />
+                <div className="rb-comment-body">
+                  <div className="rb-comment-head">
+                    <span className="rb-comment-name">{u?.name || "알 수 없음"}</span>
+                    <span className="rb-comment-date">{new Date(c.createdAt).toLocaleDateString("ko-KR")}</span>
+                  </div>
+                  <div className="rb-comment-text">{c.text}</div>
+                </div>
+                {c.userId === currentUserId && (
+                  <span className="rb-comment-del" onClick={() => delComment(c.id)}>삭제</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="rb-row" style={{ gap: 8, marginTop: 8, alignItems: "flex-end" }}>
+        <textarea className="rb-ta" value={text} onChange={(e) => setText(e.target.value)}
+          placeholder="댓글 입력…" style={{ minHeight: 44, flex: 1 }}
+          onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) addComment(); }} />
+        <button className="rb-btn acc" style={{ flex: "none", padding: "11px 14px" }}
+          disabled={!text.trim()} onClick={addComment}>
+          <Send size={15} /> 등록
+        </button>
+      </div>
+    </>
   );
 }
 
@@ -1419,7 +1486,33 @@ function CookMode({ r, timers, startTimer, pauseTimer, resetTimer, onClose, onFi
 /* ------------------------------------------------------------------ */
 /*  SHOPPING VIEW                                                      */
 /* ------------------------------------------------------------------ */
-function ShoppingView({ cartRecipes, shopList, checked, setChecked, onRemove, onClear, onOpen }) {
+function ShoppingView({ cartRecipes, checked, setChecked, onRemove, onClear, onOpen }) {
+  // 요리별 인분 설정 (기본: 각 레시피 baseServings)
+  const [servingsMap, setServingsMap] = useState({});
+  const getServings = (r) => servingsMap[r.id] ?? r.baseServings;
+  const bumpServings = (r, delta) => setServingsMap((m) => {
+    const cur = m[r.id] ?? r.baseServings;
+    return { ...m, [r.id]: Math.max(1, cur + delta) };
+  });
+
+  const shopList = useMemo(() => {
+    const map = {};
+    cartRecipes.forEach((r) => {
+      const factor = (servingsMap[r.id] ?? r.baseServings) / r.baseServings;
+      r.ingredients.forEach((ing) => {
+        const key = `${ing.name}|${ing.unit}`;
+        if (!map[key]) map[key] = { name: ing.name, unit: ing.unit, group: ing.group || "기타", amount: 0, from: [] };
+        map[key].amount += (Number(ing.amount) || 0) * factor;
+        if (!map[key].from.includes(r.title)) map[key].from.push(r.title);
+      });
+    });
+    const byGroup = {};
+    Object.entries(map).forEach(([k, v]) => {
+      (byGroup[v.group] = byGroup[v.group] || []).push({ key: k, ...v });
+    });
+    return byGroup;
+  }, [cartRecipes, servingsMap]);
+
   const total = Object.values(shopList).reduce((a, b) => a + b.length, 0);
   const doneCount = Object.values(shopList).flat().filter((x) => checked[x.key]).length;
 
@@ -1437,20 +1530,29 @@ function ShoppingView({ cartRecipes, shopList, checked, setChecked, onRemove, on
       <div className="rb-empty">
         <ShoppingCart size={36} style={{ opacity: .4 }} /><br /><br />
         장보기 목록이 비어 있어요.<br />
-        보관함에서 <ShoppingCart size={13} style={{ verticalAlign: "middle" }} /> 아이콘을 눌러 레시피를 담으면<br />
+        저장된 레시피에서 <ShoppingCart size={13} style={{ verticalAlign: "middle" }} /> 아이콘을 눌러 레시피를 담으면<br />
         필요한 재료가 자동으로 합산됩니다.
       </div>
     );
 
   return (
     <div>
-      <div style={{ display: "flex", gap: 9, flexWrap: "wrap", marginBottom: 20 }}>
+      {/* 담긴 요리 리스트 + 요리별 인분 설정 */}
+      <div className="rb-grp" style={{ fontSize: 12, fontWeight: 700, color: "var(--ink)", marginBottom: 8 }}>
+        담은 요리 {cartRecipes.length}개
+      </div>
+      <div style={{ marginBottom: 22 }}>
         {cartRecipes.map((r) => (
-          <div key={r.id} className="rb-srcpill">
-            <span className="rb-dot" style={{ background: CAT_COLOR[r.category] }} />
-            <span style={{ cursor: "pointer" }} onClick={() => onOpen(r.id)}>{r.title}</span>
-            <div className="rb-ico" style={{ width: 24, height: 24, borderRadius: 999 }} onClick={() => onRemove(r.id)}>
-              <X size={13} />
+          <div key={r.id} className="rb-shop-recipe">
+            <span className="rb-dot" style={{ background: CAT_COLOR[r.category], flex: "none" }} />
+            <span className="nm" onClick={() => onOpen(r.id)}>{r.title}</span>
+            <div className="rb-serv" style={{ flex: "none" }}>
+              <button onClick={() => bumpServings(r, -1)}><Minus size={14} /></button>
+              <b style={{ fontSize: 14 }}>{getServings(r)}인분</b>
+              <button onClick={() => bumpServings(r, 1)}><Plus size={14} /></button>
+            </div>
+            <div className="rb-ico" style={{ width: 28, height: 28, flex: "none" }} title="빼기" onClick={() => onRemove(r.id)}>
+              <X size={14} />
             </div>
           </div>
         ))}
@@ -1547,7 +1649,11 @@ function AIImport({ onAdd, currentUserId }) {
 URL이나 요리 이름만 주어지면 구글 검색을 통해 신뢰할 수 있는 정보를 찾아 한국식 가정 레시피로 재구성해.
 반드시 아래 JSON 형태만 출력하고 그 외 설명은 절대 하지 마라.
 {"title":"요리명","category":"한식","description":"설명","baseServings":2,"totalMinutes":30,"difficulty":"보통","tags":["태그"],"ingredients":[{"name":"재료명","amount":1,"unit":"개","group":"채소"}],"steps":[{"title":"단계","content":"설명","timerSeconds":null}]}
-규칙: category는 "한식"·"중식"·"양식"·"일식"·"기타" 중 하나. difficulty는 "쉬움"·"보통"·"어려움" 중 하나. group은 "채소"·"육류·해산물"·"양념·소스"·"기타" 중 하나. amount는 반드시 아라비아 숫자만 넣어라(예: 1, 2, 0.5). "적당히"·"약간"·"조금"·"한꼬집" 같은 표현은 절대 쓰지 말고 적절한 숫자로 추정해서 넣어라(모르면 1). unit은 "g"·"개"·"큰술"·"작은술"·"대"·"모"·"공기"·"ml"·"약간" 등 짧게. timerSeconds는 끓이기·삶기·재우기 등 기다림 단계에만 초 단위 숫자로 넣고 나머지는 null.`;
+규칙:
+- description은 반드시 한 문장(한 줄)으로, 음식 평론가처럼 핵심 맛·식감·정체성을 함축적으로 표현해라. 예: "두반장과 화자오의 얼얼한 맛, 부드러운 두부가 어우러진 클래식 쓰촨 요리." 절대 두 문장 이상 쓰지 마라.
+- category는 "한식"·"중식"·"양식"·"일식"·"기타" 중 하나. difficulty는 "쉬움"·"보통"·"어려움" 중 하나. group은 "채소"·"육류·해산물"·"양념·소스"·"기타" 중 하나.
+- amount는 반드시 아라비아 숫자만 넣어라(예: 1, 2, 0.5). "적당히"·"약간"·"조금"·"한꼬집" 같은 표현은 절대 쓰지 말고 적절한 숫자로 추정해서 넣어라(모르면 1). unit은 "g"·"개"·"큰술"·"작은술"·"대"·"모"·"공기"·"ml"·"약간" 등 짧게.
+- timerSeconds는 끓이기·삶기·재우기 등 기다림 단계에만 초 단위 숫자로 넣고 나머지는 null.`;
 
     try {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
@@ -1568,9 +1674,16 @@ URL이나 요리 이름만 주어지면 구글 검색을 통해 신뢰할 수 �
       }
 
       const data = await res.json();
-      const text = (data.candidates?.[0]?.content?.parts || [])
+      const cand = data.candidates?.[0];
+      const text = (cand?.content?.parts || [])
         .map((p) => p.text || "").join("\n");
       if (!text.trim()) throw new Error("응답이 비어있습니다.");
+
+      // 구글 검색 그라운딩 출처(citation) 추출
+      const chunk = cand?.groundingMetadata?.groundingChunks?.find((c) => c.web?.uri);
+      const source = chunk
+        ? { url: chunk.web.uri, title: chunk.web.title || "" }
+        : { url: "", title: "" };
 
       const clean = text.replace(/```json|```/g, "").trim();
       const m = clean.match(/\{[\s\S]*\}/);
@@ -1580,7 +1693,7 @@ URL이나 요리 이름만 주어지면 구글 검색을 통해 신뢰할 수 �
         .replace(/("amount"\s*:\s*)(?!-?\d|null|")([^,}\]]+)/g, "$10")
         .replace(/("(?:baseServings|totalMinutes|timerSeconds)"\s*:\s*)(?!-?\d|null|")([^,}\]]+)/g, "$1null");
       const obj = JSON.parse(jsonStr);
-      const recipe = normalize(obj, currentUserId);
+      const recipe = normalize(obj, currentUserId, source);
       onAdd(recipe);
     } catch (e) {
       console.error(e);
@@ -1607,7 +1720,7 @@ URL이나 요리 이름만 주어지면 구글 검색을 통해 신뢰할 수 �
   );
 }
 
-function normalize(obj, createdBy) {
+function normalize(obj, createdBy, source = {}) {
   return {
     title: obj.title || "제목 없는 레시피",
     category: CATS.includes(obj.category) ? obj.category : "기타",
@@ -1617,7 +1730,8 @@ function normalize(obj, createdBy) {
     difficulty: ["쉬움", "보통", "어려움"].includes(obj.difficulty) ? obj.difficulty : "보통",
     tags: Array.isArray(obj.tags) ? obj.tags.slice(0, 6) : [],
     createdBy, updatedBy: createdBy,
-    favorites: [], inCartBy: [], notes: {}, cookLogs: [],
+    sourceUrl: source.url || "", sourceTitle: source.title || "",
+    favorites: [], inCartBy: [], notes: {}, comments: [], cookLogs: [],
     ingredients: (obj.ingredients || []).map((i) => ({
       id: uid(), name: i.name || "", amount: Number(i.amount) || 0,
       unit: i.unit || "", group: GROUPS.includes(i.group) ? i.group : "기타",
