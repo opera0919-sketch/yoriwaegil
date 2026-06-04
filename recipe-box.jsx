@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   Search, Plus, Clock, Check, ShoppingCart, Star, Trash2, X, Play, Pause,
   RotateCcw, ChefHat, Sparkles, Minus, Loader2, Flame, ChevronRight,
@@ -253,30 +254,10 @@ const DEFAULT_USER_ID = "user_chaeyuna";
 const DEFAULT_USER = { id: DEFAULT_USER_ID, name: "채유나", emoji: "🧑‍🍳", color: "#3182F6" };
 const USER_COLORS = ["#3182F6","#F04452","#00B493","#F8971D","#8B5CF6","#EC4899","#14B8A6","#F59E0B"];
 
-/* Supabase REST API (no SDK — works in all environments) */
+/* Supabase */
 const SUPABASE_URL = "https://fbkriifozbwuaoegmmcf.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZia3JpaWZvemJ3dWFvZWdtbWNmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0NTk4MTYsImV4cCI6MjA5NjAzNTgxNn0.YGktdDGIYXVvIqdSrmhkG8um-zjZtHoRhWG4EQV60HU";
-const SB_HEADERS = {
-  apikey: SUPABASE_ANON_KEY,
-  Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-  "Content-Type": "application/json",
-};
-const sbFetch = (path, opts = {}) =>
-  fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
-    ...opts,
-    headers: { ...SB_HEADERS, ...(opts.headers || {}) },
-  });
-const db = {
-  select: (table) => sbFetch(table).then((r) => r.json()),
-  insert: (table, data) =>
-    sbFetch(table, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify(data) }),
-  upsert: (table, data) =>
-    sbFetch(table, { method: "POST", headers: { Prefer: "resolution=ignore-duplicates,return=minimal" }, body: JSON.stringify(data) }),
-  update: (table, patch, id) =>
-    sbFetch(`${table}?id=eq.${id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(patch) }),
-  del: (table, id) =>
-    sbFetch(`${table}?id=eq.${id}`, { method: "DELETE" }),
-};
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 /* localStorage — currentUserId만 탭별로 유지 */
 const localStore = {
@@ -655,53 +636,79 @@ export default function RecipeBox() {
 
   const [dbError, setDbError] = useState(null);
 
-  /* load from Supabase */
-  const loadFromDb = async () => {
-    try {
-      const dbUsers = await db.select("app_users");
+  /* load from Supabase (migrate from localStorage if DB is empty) */
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      /* ── users ── */
+      const { data: dbUsers, error: usersErr } = await supabase.from("app_users").select("*");
+      if (cancelled) return;
+      if (usersErr) { setDbError(usersErr.message); setLoaded(true); return; }
       let resolvedUsers;
-      if (!Array.isArray(dbUsers) || !dbUsers.length) {
+      if (!dbUsers || !dbUsers.length) {
         const localUsers = (() => { try { const v = localStorage.getItem("recipebox:v1:users"); return v ? JSON.parse(v) : null; } catch { return null; } })();
         resolvedUsers = (localUsers && localUsers.length) ? localUsers : [DEFAULT_USER];
-        await db.upsert("app_users", resolvedUsers);
+        const { error: insErr } = await supabase.from("app_users").upsert(resolvedUsers, { onConflict: "id", ignoreDuplicates: true });
+        if (cancelled) return;
+        if (insErr) { setDbError(insErr.message); setLoaded(true); return; }
       } else {
         resolvedUsers = dbUsers;
       }
 
+      /* ── currentUser (tab-local) ── */
       const resolvedCurUser = localStore.loadCurrentUser() || DEFAULT_USER_ID;
 
-      const dbRecipes = await db.select("recipes");
+      /* ── recipes ── */
+      const { data: dbRecipes, error: recipesErr } = await supabase.from("recipes").select("*");
+      if (cancelled) return;
+      if (recipesErr) { setDbError(recipesErr.message); setLoaded(true); return; }
       let rawRecipes;
-      if (!Array.isArray(dbRecipes) || !dbRecipes.length) {
+      if (!dbRecipes || !dbRecipes.length) {
         const localData = (() => { try { const v = localStorage.getItem("recipebox:v1:recipes"); return v ? JSON.parse(v) : null; } catch { return null; } })();
-        rawRecipes = (localData && localData.length) ? migrateRecipes(localData, resolvedCurUser) : seed();
-        await db.upsert("recipes", rawRecipes.map(toRow));
+        if (localData && localData.length) {
+          rawRecipes = migrateRecipes(localData, resolvedCurUser);
+        } else {
+          rawRecipes = seed();
+        }
+        const { error: seedErr } = await supabase.from("recipes").upsert(rawRecipes.map(toRow), { onConflict: "id", ignoreDuplicates: true });
+        if (cancelled) return;
+        if (seedErr) { setDbError(seedErr.message); setLoaded(true); return; }
       } else {
         rawRecipes = dbRecipes.map(fromRow);
       }
 
-      return { resolvedUsers, resolvedCurUser, rawRecipes };
-    } catch (e) {
-      throw new Error(e.message || "DB 연결 실패");
-    }
-  };
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const { resolvedUsers, resolvedCurUser, rawRecipes } = await loadFromDb();
-        if (cancelled) return;
-        setUsers(resolvedUsers);
-        setCurrentUserId(resolvedCurUser);
-        setRecipes(rawRecipes);
-      } catch (e) {
-        if (!cancelled) setDbError(e.message);
-      } finally {
-        if (!cancelled) setLoaded(true);
-      }
+      setUsers(resolvedUsers);
+      setCurrentUserId(resolvedCurUser);
+      setRecipes(rawRecipes);
+      setLoaded(true);
     })();
     return () => { cancelled = true; };
+  }, []);
+
+  /* Supabase Realtime — 다른 기기/탭의 변경을 실시간 반영 */
+  useEffect(() => {
+    const ch = supabase
+      .channel("recipebox-realtime")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "recipes" }, ({ new: row }) => {
+        setRecipes((r) => r.some((x) => x.id === row.id) ? r : [fromRow(row), ...r]);
+      })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "recipes" }, ({ new: row }) => {
+        setRecipes((r) => r.map((x) => x.id === row.id ? fromRow(row) : x));
+      })
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "recipes" }, ({ old: row }) => {
+        setRecipes((r) => r.filter((x) => x.id !== row.id));
+      })
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "app_users" }, ({ new: row }) => {
+        setUsers((u) => u.some((x) => x.id === row.id) ? u : [...u, row]);
+      })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "app_users" }, ({ new: row }) => {
+        setUsers((u) => u.map((x) => x.id === row.id ? row : x));
+      })
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "app_users" }, ({ old: row }) => {
+        setUsers((u) => u.filter((x) => x.id !== row.id));
+      })
+      .subscribe();
+    return () => supabase.removeChannel(ch);
   }, []);
 
   /* currentUserId는 탭별로 localStorage에만 저장 */
@@ -732,12 +739,12 @@ export default function RecipeBox() {
   /* helpers */
   const update = (id, patch) => {
     setRecipes((r) => r.map((x) => (x.id === id ? { ...x, ...patch } : x)));
-    db.update("recipes", patchToRow(patch), id);
+    supabase.from("recipes").update(patchToRow(patch)).eq("id", id);
   };
   const remove = (id) => {
     setRecipes((r) => r.filter((x) => x.id !== id));
     setDetailId(null);
-    db.del("recipes", id);
+    supabase.from("recipes").delete().eq("id", id);
   };
   const addRecipe = (r) => {
     const recipe = {
@@ -746,16 +753,16 @@ export default function RecipeBox() {
       favorites: [], inCartBy: [], notes: {}, cookLogs: [],
     };
     setRecipes((prev) => [recipe, ...prev]);
-    db.insert("recipes", toRow(recipe));
+    supabase.from("recipes").insert(toRow(recipe));
   };
   const addUser = (user) => {
     setUsers((u) => [...u, user]);
     setCurrentUserId(user.id);
-    db.insert("app_users", user);
+    supabase.from("app_users").insert(user);
   };
   const editUser = (id, patch) => {
     setUsers((u) => u.map((x) => (x.id === id ? { ...x, ...patch } : x)));
-    db.update("app_users", patch, id);
+    supabase.from("app_users").update(patch).eq("id", id);
   };
   const deleteUser = (id) => {
     setUsers((prev) => {
@@ -763,20 +770,7 @@ export default function RecipeBox() {
       if (id === currentUserId) setCurrentUserId(next[0]?.id || DEFAULT_USER_ID);
       return next;
     });
-    db.del("app_users", id);
-  };
-  const refresh = async () => {
-    setLoaded(false);
-    try {
-      const { resolvedUsers, resolvedCurUser, rawRecipes } = await loadFromDb();
-      setUsers(resolvedUsers);
-      setCurrentUserId(resolvedCurUser);
-      setRecipes(rawRecipes);
-    } catch (e) {
-      setDbError(e.message);
-    } finally {
-      setLoaded(true);
-    }
+    supabase.from("app_users").delete().eq("id", id);
   };
 
   const startTimer = (key, total) =>
@@ -891,15 +885,10 @@ export default function RecipeBox() {
             <b>{currentUser.name}</b>
             <ChevronDown size={14} color="#8B95A1" />
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            <div className="rb-stats">
-              <div className="rb-stat"><b>{recipes.length}</b><span>저장한 레시피</span></div>
-              <div className="rb-stat"><b>{triedCount}</b><span>만들어 본 요리</span></div>
-              <div className="rb-stat"><b>{cartRecipes.length}</b><span>장보기 담음</span></div>
-            </div>
-            <div className="rb-ico" title="새로고침" onClick={refresh}>
-              <RotateCcw size={16} />
-            </div>
+          <div className="rb-stats">
+            <div className="rb-stat"><b>{recipes.length}</b><span>저장한 레시피</span></div>
+            <div className="rb-stat"><b>{triedCount}</b><span>만들어 본 요리</span></div>
+            <div className="rb-stat"><b>{cartRecipes.length}</b><span>장보기 담음</span></div>
           </div>
         </header>
 
@@ -1531,6 +1520,13 @@ function AddModal({ onClose, onAdd, currentUserId }) {
   );
 }
 
+/* Gemini API key — 빌드 시 주입 (Vite: VITE_GEMINI_API_KEY).
+   하드코딩하면 공개 번들에 노출되므로 환경변수로만 받는다. */
+const GEMINI_API_KEY =
+  (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.VITE_GEMINI_API_KEY) || "";
+/* googleSearch(Grounding) 도구는 Gemini 2.0+ 에서만 지원된다. 1.5-flash는 불가. */
+const GEMINI_MODEL = "gemini-2.5-flash";
+
 function AIImport({ onAdd, currentUserId }) {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -1539,30 +1535,56 @@ function AIImport({ onAdd, currentUserId }) {
   const run = async () => {
     if (!input.trim()) return;
     setBusy(true); setErr("");
-    const sys = `너는 요리 레시피를 구조화된 JSON으로 변환하는 도구다. 사용자가 준 URL, 요리 이름, 또는 붙여넣은 레시피 텍스트를 바탕으로 레시피를 작성한다. URL이나 요리 이름만 주어지면 web_search로 신뢰할 수 있는 정보를 찾아 한국식 가정 레시피로 재구성한다. 반드시 아래 JSON만 출력하고 그 외 설명·마크다운·백틱은 절대 출력하지 마라.
-{"title":string,"category":"한식"|"중식"|"양식"|"일식"|"기타","description":string(한문장),"baseServings":number,"totalMinutes":number,"difficulty":"쉬움"|"보통"|"어려움","tags":string[],"ingredients":[{"name":string,"amount":number,"unit":string,"group":"채소"|"육류·해산물"|"양념·소스"|"기타"}],"steps":[{"title":string(짧게),"content":string,"timerSeconds":number|null}]}
-규칙: amount는 숫자, unit은 "g"·"개"·"큰술"·"작은술"·"대"·"모"·"공기"·"ml" 등 짧은 한국어. timerSeconds는 끓이기·삶기·재우기 등 기다림 단계에만 넣고 나머지는 null. content는 한국어로 친절하게.`;
+
+    if (!GEMINI_API_KEY) {
+      setErr("Gemini API 키가 설정되어 있지 않아요. 관리자에게 문의하거나 '직접 입력'을 사용해 주세요.");
+      setBusy(false);
+      return;
+    }
+
+    const sys = `너는 요리 레시피를 구조화된 JSON으로 변환하는 전문가야.
+사용자가 준 요리 이름, URL, 또는 레시피 텍스트를 바탕으로 레시피를 작성해.
+URL이나 요리 이름만 주어지면 구글 검색을 통해 신뢰할 수 있는 정보를 찾아 한국식 가정 레시피로 재구성해.
+반드시 아래 JSON 형태만 출력하고 그 외 설명은 절대 하지 마라.
+{"title":"요리명","category":"한식","description":"설명","baseServings":2,"totalMinutes":30,"difficulty":"보통","tags":["태그"],"ingredients":[{"name":"재료명","amount":1,"unit":"개","group":"채소"}],"steps":[{"title":"단계","content":"설명","timerSeconds":null}]}
+규칙: category는 "한식"·"중식"·"양식"·"일식"·"기타" 중 하나. difficulty는 "쉬움"·"보통"·"어려움" 중 하나. group은 "채소"·"육류·해산물"·"양념·소스"·"기타" 중 하나. amount는 반드시 아라비아 숫자만 넣어라(예: 1, 2, 0.5). "적당히"·"약간"·"조금"·"한꼬집" 같은 표현은 절대 쓰지 말고 적절한 숫자로 추정해서 넣어라(모르면 1). unit은 "g"·"개"·"큰술"·"작은술"·"대"·"모"·"공기"·"ml"·"약간" 등 짧게. timerSeconds는 끓이기·삶기·재우기 등 기다림 단계에만 초 단위 숫자로 넣고 나머지는 null.`;
+
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+
+      const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 2000,
-          system: sys,
-          messages: [{ role: "user", content: input }],
-          tools: [{ type: "web_search_20250305", name: "web_search" }],
+          systemInstruction: { parts: [{ text: sys }] },
+          contents: [{ role: "user", parts: [{ text: input }] }],
+          tools: [{ googleSearch: {} }],
         }),
       });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(`API Error: ${errorData.error?.message || res.status}`);
+      }
+
       const data = await res.json();
-      const text = (data.content || []).filter((b) => b.type === "text").map((b) => b.text).join("\n");
+      const text = (data.candidates?.[0]?.content?.parts || [])
+        .map((p) => p.text || "").join("\n");
+      if (!text.trim()) throw new Error("응답이 비어있습니다.");
+
       const clean = text.replace(/```json|```/g, "").trim();
       const m = clean.match(/\{[\s\S]*\}/);
-      const obj = JSON.parse(m ? m[0] : clean);
+      let jsonStr = m ? m[0] : clean;
+      // 안전망: 숫자 필드에 비숫자 unquoted 값(예: "amount":적당히)이 오면 null로 복구
+      jsonStr = jsonStr
+        .replace(/("amount"\s*:\s*)(?!-?\d|null|")([^,}\]]+)/g, "$10")
+        .replace(/("(?:baseServings|totalMinutes|timerSeconds)"\s*:\s*)(?!-?\d|null|")([^,}\]]+)/g, "$1null");
+      const obj = JSON.parse(jsonStr);
       const recipe = normalize(obj, currentUserId);
       onAdd(recipe);
     } catch (e) {
-      setErr("레시피를 불러오지 못했어요. 요리 이름을 더 구체적으로 적거나, 레시피 텍스트를 붙여넣거나, '직접 입력'을 사용해 보세요.");
+      console.error(e);
+      setErr("검색 또는 레시피 생성에 실패했어요. 입력 내용을 확인하거나 잠시 후 다시 시도해 주세요.");
     } finally {
       setBusy(false);
     }
@@ -1571,15 +1593,15 @@ function AIImport({ onAdd, currentUserId }) {
   return (
     <div>
       <p style={{ fontSize: 13.5, color: "var(--soft)", lineHeight: 1.6, marginBottom: 14 }}>
-        요리 이름(예: <b>알리오 올리오</b>), 레시피 <b>URL</b>, 또는 레시피 <b>전체 텍스트</b>를 붙여넣으세요.
-        AI가 웹에서 찾아 재료·단계·타이머까지 자동으로 정리해 줍니다.
+        요리 이름(예: <b>편스토랑 어남선생 닭볶음탕</b>), <b>URL</b>, 또는 레시피 <b>텍스트</b>를 넣으세요.
+        AI가 <b>웹 검색</b>을 통해 재료·단계·타이머까지 자동으로 정리해 줍니다.
       </p>
       <textarea className="rb-ta" value={input} onChange={(e) => setInput(e.target.value)}
         placeholder={"예) 백종원 김치찌개\n또는 https://...\n또는 레시피 텍스트 붙여넣기"} style={{ minHeight: 130 }} />
       {err && <div style={{ color: "var(--danger)", fontSize: 12.5, marginTop: 8 }}>{err}</div>}
       <button className="rb-btn acc" style={{ marginTop: 14, width: "100%", justifyContent: "center", padding: 13 }}
         disabled={busy || !input.trim()} onClick={run}>
-        {busy ? <><Loader2 size={16} className="rb-spin" /> 가져오는 중…</> : <><Sparkles size={16} /> AI로 정리하기</>}
+        {busy ? <><Loader2 size={16} className="rb-spin" /> 검색 및 가져오는 중…</> : <><Sparkles size={16} /> AI로 검색 및 정리하기</>}
       </button>
     </div>
   );
