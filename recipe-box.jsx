@@ -266,6 +266,14 @@ const CSS = `
 .rb-citation:hover { text-decoration:underline; }
 .rb-citation span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
+/* toast */
+.rb-toaster { position:fixed; left:50%; bottom:28px; transform:translateX(-50%); z-index:80;
+  display:flex; flex-direction:column; gap:8px; align-items:center; pointer-events:none; }
+.rb-toast { background:var(--ink); color:#fff; padding:11px 18px; border-radius:999px;
+  font-size:13.5px; font-weight:600; box-shadow:0 6px 24px rgba(0,0,0,.25);
+  display:flex; align-items:center; gap:8px; max-width:90vw; animation:rb-toast-in .22s both; }
+@keyframes rb-toast-in { from{opacity:0; transform:translateY(12px) scale(.96);} to{opacity:1; transform:none;} }
+
 @keyframes rb-up { from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:none;} }
 @keyframes rb-up-sheet { from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:none;} }
 @keyframes rb-fade { from{opacity:0;}to{opacity:1;} }
@@ -358,6 +366,12 @@ const PATCH_MAP = {
 };
 const patchToRow = (patch) =>
   Object.fromEntries(Object.entries(patch).map(([k, v]) => [PATCH_MAP[k] || k, v]));
+
+/* ------------------------------------------------------------------ */
+/*  TOAST BUS  (전역 — prop drilling 없이 어디서든 toast() 호출)        */
+/* ------------------------------------------------------------------ */
+const toastListeners = new Set();
+const toast = (msg) => toastListeners.forEach((fn) => fn(msg));
 
 const uid = () => Math.random().toString(36).slice(2, 9);
 const fmt = (n) => {
@@ -507,6 +521,29 @@ const seed = () => [
     ],
   },
 ];
+
+/* ------------------------------------------------------------------ */
+/*  TOASTER                                                            */
+/* ------------------------------------------------------------------ */
+function Toaster() {
+  const [items, setItems] = useState([]);
+  useEffect(() => {
+    const fn = (msg) => {
+      const id = uid();
+      setItems((s) => [...s, { id, msg }]);
+      setTimeout(() => setItems((s) => s.filter((x) => x.id !== id)), 2200);
+    };
+    toastListeners.add(fn);
+    return () => toastListeners.delete(fn);
+  }, []);
+  return (
+    <div className="rb-toaster">
+      {items.map((t) => (
+        <div key={t.id} className="rb-toast"><Check size={15} /> {t.msg}</div>
+      ))}
+    </div>
+  );
+}
 
 /* ------------------------------------------------------------------ */
 /*  USER AVATAR                                                        */
@@ -786,6 +823,7 @@ export default function RecipeBox() {
     setRecipes((r) => r.filter((x) => x.id !== id));
     setDetailId(null);
     supabase.from("recipes").delete().eq("id", id);
+    toast("레시피를 삭제했어요");
   };
   const addRecipe = (r) => {
     const recipe = {
@@ -796,15 +834,18 @@ export default function RecipeBox() {
     };
     setRecipes((prev) => [recipe, ...prev]);
     supabase.from("recipes").insert(toRow(recipe));
+    toast(`'${recipe.title}' 저장됨`);
   };
   const addUser = (user) => {
     setUsers((u) => [...u, user]);
     setCurrentUserId(user.id);
     supabase.from("app_users").insert(user);
+    toast(`${user.name} 사용자를 추가했어요`);
   };
   const editUser = (id, patch) => {
     setUsers((u) => u.map((x) => (x.id === id ? { ...x, ...patch } : x)));
     supabase.from("app_users").update(patch).eq("id", id);
+    toast("사용자 정보를 수정했어요");
   };
   const deleteUser = (id) => {
     setUsers((prev) => {
@@ -813,6 +854,7 @@ export default function RecipeBox() {
       return next;
     });
     supabase.from("app_users").delete().eq("id", id);
+    toast("사용자를 삭제했어요");
   };
 
   const startTimer = (key, total) =>
@@ -838,6 +880,7 @@ export default function RecipeBox() {
       newLogs = [...logs, { userId: currentUserId, count: 1, lastCookedAt: Date.now(), ...rate, ...memo }];
     }
     update(id, { cookLogs: newLogs, updatedBy: currentUserId });
+    toast("조리 기록을 추가했어요 🍳");
   };
 
   /* derived */
@@ -932,20 +975,20 @@ export default function RecipeBox() {
 
         {tab === "box" && (
           <>
-            <div className="rb-bar">
-              <div className="rb-search" style={{ flex: "0 1 58%", minWidth: 180 }}>
+            <div className="rb-bar" style={{ flexWrap: "nowrap" }}>
+              <div className="rb-search" style={{ flex: "1 1 auto", minWidth: 100 }}>
                 <Search size={17} color="#8B95A1" />
-                <input placeholder="요리 이름, 재료, 태그로 검색…" value={q} onChange={(e) => setQ(e.target.value)} />
+                <input placeholder="요리·재료·태그 검색…" value={q} onChange={(e) => setQ(e.target.value)} />
                 {q && <X size={16} style={{ cursor: "pointer", color: "#8B95A1" }} onClick={() => setQ("")} />}
               </div>
               <button className="rb-ico" title={favOnly ? "전체 보기" : "즐겨찾기만 보기"}
                 onClick={() => setFavOnly((v) => !v)}
-                style={{ marginLeft: "auto", width: 42, height: 42,
+                style={{ flex: "none", width: 42, height: 42,
                   ...(favOnly ? { borderColor: "var(--gold)", color: "var(--gold)", background: "#FFFBE6" } : {}) }}>
                 <Star size={17} fill={favOnly ? "#F8C83A" : "none"} />
               </button>
               <select className="rb-sel" value={sort} onChange={(e) => setSort(e.target.value)}
-                style={{ width: 130, flex: "none" }}>
+                style={{ width: 116, flex: "none" }}>
                 <option value="default">기본순</option>
                 <option value="created">최근 추가순</option>
                 <option value="recent">최근 조리순</option>
@@ -1003,6 +1046,7 @@ export default function RecipeBox() {
                                   ? (r.favorites || []).filter((id) => id !== currentUserId)
                                   : [...(r.favorites || []), currentUserId],
                               });
+                              toast(isFav ? "즐겨찾기 해제" : "즐겨찾기에 추가 ⭐");
                             }}>
                             <Star size={16} fill={isFav ? "#F8C83A" : "none"} />
                           </div>
@@ -1052,11 +1096,14 @@ export default function RecipeBox() {
                         <div
                           className={`rb-ico ${inCart ? "cart" : ""}`}
                           title="장보기 목록에 담기"
-                          onClick={() => update(r.id, {
-                            inCartBy: inCart
-                              ? (r.inCartBy || []).filter((id) => id !== currentUserId)
-                              : [...(r.inCartBy || []), currentUserId],
-                          })}>
+                          onClick={() => {
+                            update(r.id, {
+                              inCartBy: inCart
+                                ? (r.inCartBy || []).filter((id) => id !== currentUserId)
+                                : [...(r.inCartBy || []), currentUserId],
+                            });
+                            toast(inCart ? "장보기에서 뺐어요" : "장보기에 담았어요 🛒");
+                          }}>
                           <ShoppingCart size={16} />
                         </div>
                       </div>
@@ -1075,10 +1122,13 @@ export default function RecipeBox() {
               const r = recipes.find((x) => x.id === id);
               if (!r) return;
               update(id, { inCartBy: (r.inCartBy || []).filter((uid) => uid !== currentUserId) });
+              toast("장보기에서 뺐어요");
             }}
-            onClear={() => cartRecipes.forEach((r) =>
-              update(r.id, { inCartBy: (r.inCartBy || []).filter((uid) => uid !== currentUserId) })
-            )}
+            onClear={() => {
+              cartRecipes.forEach((r) =>
+                update(r.id, { inCartBy: (r.inCartBy || []).filter((uid) => uid !== currentUserId) }));
+              toast("장보기 목록을 비웠어요");
+            }}
             onOpen={(id) => setDetailId(id)}
           />
         )}
@@ -1129,6 +1179,8 @@ export default function RecipeBox() {
           onClose={() => setShowUserSwitcher(false)}
         />
       )}
+
+      <Toaster />
     </div>
   );
 }
@@ -1177,7 +1229,7 @@ function Detail({ r, timers, startTimer, pauseTimer, resetTimer, onClose, update
           <div className="rb-sh-body">
             <ManualForm
               currentUserId={currentUserId} initial={r} submitLabel="변경 저장"
-              onSubmit={(updated) => { update(r.id, updated); setEditing(false); }}
+              onSubmit={(updated) => { update(r.id, updated); setEditing(false); toast("레시피를 수정했어요"); }}
             />
           </div>
         </div>
@@ -1202,11 +1254,14 @@ function Detail({ r, timers, startTimer, pauseTimer, resetTimer, onClose, update
             <div className="rb-ico" title="편집" onClick={() => setEditing(true)}><Pencil size={15} /></div>
             <div
               className={`rb-ico ${isFav ? "on" : ""}`}
-              onClick={() => update(r.id, {
-                favorites: isFav
-                  ? (r.favorites || []).filter((id) => id !== currentUserId)
-                  : [...(r.favorites || []), currentUserId],
-              })}>
+              onClick={() => {
+                update(r.id, {
+                  favorites: isFav
+                    ? (r.favorites || []).filter((id) => id !== currentUserId)
+                    : [...(r.favorites || []), currentUserId],
+                });
+                toast(isFav ? "즐겨찾기 해제" : "즐겨찾기에 추가 ⭐");
+              }}>
               <Star size={16} fill={isFav ? "#F8C83A" : "none"} />
             </div>
             <div className="rb-ico" onClick={onClose}><X size={17} /></div>
@@ -1249,11 +1304,14 @@ function Detail({ r, timers, startTimer, pauseTimer, resetTimer, onClose, update
             <button className="rb-btn dark" onClick={onCook}><Play size={15} /> 요리 모드 시작</button>
             <button className="rb-btn" onClick={() => markCooked(r.id)}><Check size={15} /> 만들었어요 +1</button>
             <button className={`rb-btn ${inCart ? "acc" : ""}`}
-              onClick={() => update(r.id, {
-                inCartBy: inCart
-                  ? (r.inCartBy || []).filter((id) => id !== currentUserId)
-                  : [...(r.inCartBy || []), currentUserId],
-              })}>
+              onClick={() => {
+                update(r.id, {
+                  inCartBy: inCart
+                    ? (r.inCartBy || []).filter((id) => id !== currentUserId)
+                    : [...(r.inCartBy || []), currentUserId],
+                });
+                toast(inCart ? "장보기에서 뺐어요" : "장보기에 담았어요 🛒");
+              }}>
               <ShoppingCart size={15} /> {inCart ? "장보기 담김" : "장보기 담기"}
             </button>
           </div>
@@ -1335,9 +1393,11 @@ function CommentSection({ r, users, currentUserId, update }) {
     const next = [...comments, { id: uid(), userId: currentUserId, text: t, createdAt: Date.now() }];
     update(r.id, { comments: next });
     setText("");
+    toast("댓글을 등록했어요");
   };
   const delComment = (cid) => {
     update(r.id, { comments: comments.filter((c) => c.id !== cid) });
+    toast("댓글을 삭제했어요");
   };
 
   return (
@@ -1346,11 +1406,7 @@ function CommentSection({ r, users, currentUserId, update }) {
         {comments.length > 0 && <span style={{ color: "var(--soft)", fontWeight: 400, fontSize: 13 }}>{comments.length}</span>}
       </div>
 
-      {comments.length === 0 ? (
-        <div style={{ color: "var(--soft)", fontSize: 13, padding: "4px 0 10px" }}>
-          첫 댓글을 남겨보세요. 만들어 본 후기, 간 조절, 가족 반응 등을 공유할 수 있어요.
-        </div>
-      ) : (
+      {comments.length > 0 && (
         <div style={{ marginBottom: 6 }}>
           {comments.slice().sort((a, b) => a.createdAt - b.createdAt).map((c) => {
             const u = users.find((x) => x.id === c.userId);
@@ -1373,13 +1429,15 @@ function CommentSection({ r, users, currentUserId, update }) {
         </div>
       )}
 
-      <div className="rb-row" style={{ gap: 8, marginTop: 8, alignItems: "flex-end" }}>
+      <div style={{ position: "relative", marginTop: 8 }}>
         <textarea className="rb-ta" value={text} onChange={(e) => setText(e.target.value)}
-          placeholder="댓글 입력…" style={{ minHeight: 44, flex: 1 }}
+          placeholder="댓글 입력…" style={{ minHeight: 48, paddingRight: 52 }}
           onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) addComment(); }} />
-        <button className="rb-btn acc" style={{ flex: "none", padding: "11px 14px" }}
+        <button className="rb-btn acc" title="댓글 등록"
+          style={{ position: "absolute", right: 8, bottom: 8, padding: 0, width: 36, height: 36,
+            borderRadius: 999, justifyContent: "center" }}
           disabled={!text.trim()} onClick={addComment}>
-          <Send size={15} /> 등록
+          <Send size={16} />
         </button>
       </div>
     </>
