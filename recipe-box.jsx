@@ -4,7 +4,7 @@ import {
   Search, Plus, Clock, Check, ShoppingCart, Star, Trash2, X, Play, Pause,
   RotateCcw, ChefHat, Sparkles, Minus, Loader2, Flame, ChevronRight,
   ChevronLeft, Copy, ListChecks, Utensils, Bookmark, Pencil, ChevronDown,
-  MessageCircle, Send, Link2,
+  MessageCircle, Send, Link2, LogIn, LogOut,
 } from "lucide-react";
 
 /* ------------------------------------------------------------------ */
@@ -374,6 +374,7 @@ const toastListeners = new Set();
 const toast = (msg) => toastListeners.forEach((fn) => fn(msg));
 
 const uid = () => Math.random().toString(36).slice(2, 9);
+const hashStr = (s) => { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return h; };
 const fmt = (n) => {
   if (n == null || isNaN(n)) return "";
   const r = Math.round(n * 100) / 100;
@@ -550,142 +551,81 @@ function Toaster() {
 /* ------------------------------------------------------------------ */
 function UserAvatar({ user, size = 36 }) {
   if (!user) return null;
+  const url = user.avatar_url || user.avatarUrl;
   return (
-    <div className="rb-avatar" style={{ width: size, height: size, fontSize: size * 0.5 }}>
-      {user.emoji}
+    <div className="rb-avatar" style={{ width: size, height: size, fontSize: size * 0.5, padding: 0, overflow: "hidden" }}>
+      {url
+        ? <img src={url} alt="" referrerPolicy="no-referrer"
+            style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "inherit" }} />
+        : (user.emoji || "🧑")}
     </div>
   );
 }
 
 /* ------------------------------------------------------------------ */
-/*  USER SWITCHER                                                      */
+/*  GOOGLE ICON                                                        */
 /* ------------------------------------------------------------------ */
-const EMOJIS = ["🧑‍🍳","👩‍🍳","🧑","👦","👧","👩","👨","🧒","🧓","👴","👵","🍳"];
-
-function UserForm({ initialName = "", initialEmoji = "🧑‍🍳", submitLabel, onSubmit, onCancel }) {
-  const [name, setName] = useState(initialName);
-  const [emoji, setEmoji] = useState(initialEmoji);
-  const handle = () => { if (name.trim()) onSubmit(name.trim(), emoji); };
-
+function GoogleIcon({ size = 18 }) {
   return (
-    <div style={{ marginTop: 16 }}>
-      <div className="rb-field">
-        <label className="rb-lab">이름</label>
-        <input
-          className="rb-in" value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="예) 민준" autoFocus
-          onKeyDown={(e) => e.key === "Enter" && handle()}
-        />
-      </div>
-      <label className="rb-lab">이모지</label>
-      <div className="rb-emoji-grid">
-        {EMOJIS.map((em) => (
-          <button
-            key={em}
-            className={`rb-emoji-btn ${emoji === em ? "on" : ""}`}
-            onClick={() => setEmoji(em)}
-          >{em}</button>
-        ))}
-      </div>
-      <div className="rb-row" style={{ marginTop: 16, gap: 8 }}>
-        <button
-          className="rb-btn acc" style={{ flex: 1, justifyContent: "center" }}
-          disabled={!name.trim()} onClick={handle}
-        >
-          <Check size={16} /> {submitLabel}
-        </button>
-        <button className="rb-btn" onClick={onCancel}>취소</button>
-      </div>
-    </div>
+    <svg width={size} height={size} viewBox="0 0 18 18" aria-hidden>
+      <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.71-1.57 2.68-3.89 2.68-6.62z" />
+      <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.81.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z" />
+      <path fill="#FBBC05" d="M3.97 10.72A5.41 5.41 0 0 1 3.68 9c0-.6.1-1.18.29-1.72V4.95H.96A9 9 0 0 0 0 9c0 1.45.35 2.82.96 4.05l3.01-2.33z" />
+      <path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z" />
+    </svg>
   );
 }
 
-function UserSwitcher({ users, currentUserId, onSwitch, onAdd, onEdit, onDelete, onClose }) {
-  const [adding, setAdding] = useState(false);
-  const [editingId, setEditingId] = useState(null);
-
-  const handleAdd = (name, emoji) => {
-    const color = USER_COLORS[users.length % USER_COLORS.length];
-    onAdd({ id: uid(), name, emoji, color });
-    setAdding(false);
-  };
-  const handleEdit = (id, name, emoji) => {
-    onEdit(id, { name, emoji });
-    setEditingId(null);
-  };
-  const handleDelete = (u) => {
-    if (users.length <= 1) {
-      alert("마지막 사용자는 삭제할 수 없어요.");
-      return;
-    }
-    if (confirm(`'${u.name}' 사용자를 삭제할까요?\n공유 레시피는 그대로 남고, 이 사용자의 즐겨찾기·메모·조리 기록만 사라집니다.`))
-      onDelete(u.id);
-  };
-
+/* ------------------------------------------------------------------ */
+/*  LOGIN SHEET                                                        */
+/* ------------------------------------------------------------------ */
+function LoginSheet({ onClose, onSignIn }) {
   return (
     <div className="rb-ov" onClick={onClose}>
-      <div className="rb-sheet" style={{ maxWidth: 480 }} onClick={(e) => e.stopPropagation()}>
+      <div className="rb-sheet" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
         <div className="rb-sh-head">
-          <b style={{ fontSize: 17 }}>사용자 관리</b>
+          <b style={{ fontSize: 17 }}>로그인</b>
+          <div className="rb-ico" onClick={onClose}><X size={17} /></div>
+        </div>
+        <div className="rb-sh-body" style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>🍳</div>
+          <p style={{ color: "var(--soft)", fontSize: 14, lineHeight: 1.6, marginTop: 0, marginBottom: 20 }}>
+            구글 계정으로 로그인하면 즐겨찾기·장보기·댓글·조리 기록을 남길 수 있어요.<br />
+            로그인 없이도 레시피 둘러보기는 자유롭게 가능합니다.
+          </p>
+          <button className="rb-btn" style={{ width: "100%", justifyContent: "center", padding: 13, fontWeight: 700 }}
+            onClick={onSignIn}>
+            <GoogleIcon /> Google로 계속하기
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  ACCOUNT MENU                                                       */
+/* ------------------------------------------------------------------ */
+function AccountMenu({ user, email, onSignOut, onClose }) {
+  return (
+    <div className="rb-ov" onClick={onClose}>
+      <div className="rb-sheet" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
+        <div className="rb-sh-head">
+          <b style={{ fontSize: 17 }}>내 계정</b>
           <div className="rb-ico" onClick={onClose}><X size={17} /></div>
         </div>
         <div className="rb-sh-body">
-          {users.map((u) =>
-            editingId === u.id ? (
-              <UserForm
-                key={u.id}
-                initialName={u.name} initialEmoji={u.emoji} submitLabel="변경 저장"
-                onSubmit={(name, emoji) => handleEdit(u.id, name, emoji)}
-                onCancel={() => setEditingId(null)}
-              />
-            ) : (
-              <div
-                key={u.id}
-                className={`rb-user-row ${u.id === currentUserId ? "active" : ""}`}
-              >
-                <div
-                  style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0, cursor: "pointer" }}
-                  onClick={() => onSwitch(u.id)}
-                >
-                  <UserAvatar user={u} size={44} />
-                  <span style={{ flex: 1, fontWeight: u.id === currentUserId ? 700 : 400, fontSize: 15,
-                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {u.name}
-                  </span>
-                  {u.id === currentUserId && <Check size={18} color="var(--accent)" />}
-                </div>
-                <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                  <div className="rb-ico" title="수정"
-                    style={{ width: 30, height: 30 }}
-                    onClick={(e) => { e.stopPropagation(); setAdding(false); setEditingId(u.id); }}>
-                    <Pencil size={14} />
-                  </div>
-                  <div className="rb-ico" title="삭제"
-                    style={{ width: 30, height: 30 }}
-                    onClick={(e) => { e.stopPropagation(); handleDelete(u); }}>
-                    <Trash2 size={14} />
-                  </div>
-                </div>
-              </div>
-            )
-          )}
-
-          {adding ? (
-            <UserForm
-              submitLabel="추가"
-              onSubmit={handleAdd}
-              onCancel={() => setAdding(false)}
-            />
-          ) : (
-            <button
-              className="rb-btn"
-              style={{ marginTop: 16, width: "100%", justifyContent: "center" }}
-              onClick={() => { setEditingId(null); setAdding(true); }}
-            >
-              <Plus size={15} /> 새 사용자 추가
-            </button>
-          )}
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+            <UserAvatar user={user} size={48} />
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontWeight: 700, fontSize: 16 }}>{user.name}</div>
+              {email && <div style={{ fontSize: 12.5, color: "var(--soft)", overflow: "hidden",
+                textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{email}</div>}
+            </div>
+          </div>
+          <button className="rb-btn" style={{ width: "100%", justifyContent: "center" }} onClick={onSignOut}>
+            <LogOut size={15} /> 로그아웃
+          </button>
         </div>
       </div>
     </div>
@@ -699,7 +639,7 @@ export default function RecipeBox() {
   const [recipes, setRecipes] = useState([]);
   const [loaded, setLoaded] = useState(false);
   const [users, setUsers] = useState([]);
-  const [currentUserId, setCurrentUserId] = useState(null);
+  const [session, setSession] = useState(null);
   const [tab, setTab] = useState("box");
   const [cat, setCat] = useState("all");
   const [q, setQ] = useState("");
@@ -708,11 +648,15 @@ export default function RecipeBox() {
   const [detailId, setDetailId] = useState(null);
   const [cookId, setCookId] = useState(null);
   const [showAdd, setShowAdd] = useState(false);
-  const [showUserSwitcher, setShowUserSwitcher] = useState(false);
+  const [showLogin, setShowLogin] = useState(false);
+  const [showAccountMenu, setShowAccountMenu] = useState(false);
   const [timers, setTimers] = useState({});
   const [checked, setChecked] = useState({});
 
   const [dbError, setDbError] = useState(null);
+
+  /* 로그인한 구글 사용자 = 현재 사용자 (비로그인 시 null → 읽기 전용) */
+  const currentUserId = session?.user?.id || null;
 
   /* load from Supabase (migrate from localStorage if DB is empty) */
   useEffect(() => {
@@ -733,9 +677,6 @@ export default function RecipeBox() {
         resolvedUsers = dbUsers;
       }
 
-      /* ── currentUser (tab-local) ── */
-      const resolvedCurUser = localStore.loadCurrentUser() || DEFAULT_USER_ID;
-
       /* ── recipes ── */
       const { data: dbRecipes, error: recipesErr } = await supabase.from("recipes").select("*");
       if (cancelled) return;
@@ -744,7 +685,7 @@ export default function RecipeBox() {
       if (!dbRecipes || !dbRecipes.length) {
         const localData = (() => { try { const v = localStorage.getItem("recipebox:v1:recipes"); return v ? JSON.parse(v) : null; } catch { return null; } })();
         if (localData && localData.length) {
-          rawRecipes = migrateRecipes(localData, resolvedCurUser);
+          rawRecipes = migrateRecipes(localData, DEFAULT_USER_ID);
         } else {
           rawRecipes = seed();
         }
@@ -756,12 +697,36 @@ export default function RecipeBox() {
       }
 
       setUsers(resolvedUsers);
-      setCurrentUserId(resolvedCurUser);
       setRecipes(rawRecipes);
       setLoaded(true);
     })();
     return () => { cancelled = true; };
   }, []);
+
+  /* ── 구글 OAuth 세션 ── */
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setSession(data.session));
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, sess) => setSession(sess));
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  /* 로그인 시 구글 프로필을 app_users에 동기화(이름·아바타) */
+  useEffect(() => {
+    const u = session?.user;
+    if (!u) return;
+    const meta = u.user_metadata || {};
+    const profile = {
+      id: u.id,
+      name: meta.full_name || meta.name || (u.email || "").split("@")[0] || "사용자",
+      emoji: "🧑‍🍳",
+      color: USER_COLORS[Math.abs(hashStr(u.id)) % USER_COLORS.length],
+      avatar_url: meta.avatar_url || meta.picture || "",
+    };
+    setUsers((list) => list.some((x) => x.id === u.id)
+      ? list.map((x) => (x.id === u.id ? { ...x, ...profile } : x))
+      : [...list, profile]);
+    supabase.from("app_users").upsert(profile, { onConflict: "id" });
+  }, [session?.user?.id]);
 
   /* Supabase Realtime — 다른 기기/탭의 변경을 실시간 반영 */
   useEffect(() => {
@@ -789,12 +754,6 @@ export default function RecipeBox() {
     return () => supabase.removeChannel(ch);
   }, []);
 
-  /* currentUserId는 탭별로 localStorage에만 저장 */
-  useEffect(() => {
-    if (!loaded) return;
-    localStore.saveCurrentUser(currentUserId);
-  }, [currentUserId, loaded]);
-
   /* timer tick */
   const running = Object.values(timers).some((t) => t.running);
   useEffect(() => {
@@ -814,18 +773,40 @@ export default function RecipeBox() {
     return () => clearInterval(iv);
   }, [running]);
 
+  /* auth */
+  const signIn = () => supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: window.location.origin + window.location.pathname,
+      queryParams: { prompt: "select_account" },
+    },
+  });
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    setShowAccountMenu(false);
+    toast("로그아웃되었어요");
+  };
+  /* 로그인 필요 동작 가드 — 비로그인 시 로그인 시트를 띄우고 false 반환 */
+  const requireLogin = () => {
+    if (currentUserId) return true;
+    setShowLogin(true);
+    return false;
+  };
+
   /* helpers */
   const update = (id, patch) => {
     setRecipes((r) => r.map((x) => (x.id === id ? { ...x, ...patch } : x)));
     supabase.from("recipes").update(patchToRow(patch)).eq("id", id);
   };
   const remove = (id) => {
+    if (!requireLogin()) return;
     setRecipes((r) => r.filter((x) => x.id !== id));
     setDetailId(null);
     supabase.from("recipes").delete().eq("id", id);
     toast("레시피를 삭제했어요");
   };
   const addRecipe = (r) => {
+    if (!requireLogin()) return;
     const recipe = {
       ...r, id: uid(),
       createdBy: currentUserId, updatedBy: currentUserId,
@@ -836,25 +817,25 @@ export default function RecipeBox() {
     supabase.from("recipes").insert(toRow(recipe));
     toast(`'${recipe.title}' 저장됨`);
   };
-  const addUser = (user) => {
-    setUsers((u) => [...u, user]);
-    setCurrentUserId(user.id);
-    supabase.from("app_users").insert(user);
-    toast(`${user.name} 사용자를 추가했어요`);
-  };
-  const editUser = (id, patch) => {
-    setUsers((u) => u.map((x) => (x.id === id ? { ...x, ...patch } : x)));
-    supabase.from("app_users").update(patch).eq("id", id);
-    toast("사용자 정보를 수정했어요");
-  };
-  const deleteUser = (id) => {
-    setUsers((prev) => {
-      const next = prev.filter((x) => x.id !== id);
-      if (id === currentUserId) setCurrentUserId(next[0]?.id || DEFAULT_USER_ID);
-      return next;
+  const toggleFav = (r) => {
+    if (!requireLogin()) return;
+    const isFav = r.favorites?.includes(currentUserId);
+    update(r.id, {
+      favorites: isFav
+        ? (r.favorites || []).filter((id) => id !== currentUserId)
+        : [...(r.favorites || []), currentUserId],
     });
-    supabase.from("app_users").delete().eq("id", id);
-    toast("사용자를 삭제했어요");
+    toast(isFav ? "즐겨찾기 해제" : "즐겨찾기에 추가 ⭐");
+  };
+  const toggleCart = (r) => {
+    if (!requireLogin()) return;
+    const inCart = r.inCartBy?.includes(currentUserId);
+    update(r.id, {
+      inCartBy: inCart
+        ? (r.inCartBy || []).filter((id) => id !== currentUserId)
+        : [...(r.inCartBy || []), currentUserId],
+    });
+    toast(inCart ? "장보기에서 뺐어요" : "장보기에 담았어요 🛒");
   };
 
   const startTimer = (key, total) =>
@@ -865,6 +846,7 @@ export default function RecipeBox() {
     setTimers((t) => ({ ...t, [key]: { remaining: total, total, running: false } }));
 
   const markCooked = (id, extra = {}) => {
+    if (!requireLogin()) return;
     const r = recipes.find((x) => x.id === id);
     if (!r) return;
     const logs = r.cookLogs || [];
@@ -884,7 +866,15 @@ export default function RecipeBox() {
   };
 
   /* derived */
-  const currentUser = users.find((u) => u.id === currentUserId) || DEFAULT_USER;
+  const meta = session?.user?.user_metadata || {};
+  const currentUser = currentUserId
+    ? (users.find((u) => u.id === currentUserId) || {
+        id: currentUserId,
+        name: meta.full_name || meta.name || (session.user.email || "").split("@")[0] || "사용자",
+        emoji: "🧑‍🍳",
+        avatar_url: meta.avatar_url || meta.picture || "",
+      })
+    : null;
 
   const filtered = useMemo(() => {
     let list = recipes.filter((r) => {
@@ -950,11 +940,17 @@ export default function RecipeBox() {
       <div className="rb-wrap">
         {/* header */}
         <header className="rb-top">
-          <div className="rb-user-btn" onClick={() => setShowUserSwitcher(true)}>
-            <UserAvatar user={currentUser} size={32} />
-            <b>{currentUser.name}</b>
-            <ChevronDown size={14} color="#8B95A1" />
-          </div>
+          {currentUser ? (
+            <div className="rb-user-btn" onClick={() => setShowAccountMenu(true)}>
+              <UserAvatar user={currentUser} size={32} />
+              <b>{currentUser.name}</b>
+              <ChevronDown size={14} color="#8B95A1" />
+            </div>
+          ) : (
+            <button className="rb-btn acc" onClick={signIn}>
+              <LogIn size={15} /> 로그인
+            </button>
+          )}
           <div className="rb-stats">
             <div className="rb-stat"><b>{recipes.length}</b><span>저장한 레시피</span></div>
             <div className="rb-stat"><b>{triedCount}</b><span>만들어 본 요리</span></div>
@@ -1039,15 +1035,7 @@ export default function RecipeBox() {
                           </div>
                           <div
                             className={`rb-ico ${isFav ? "on" : ""}`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              update(r.id, {
-                                favorites: isFav
-                                  ? (r.favorites || []).filter((id) => id !== currentUserId)
-                                  : [...(r.favorites || []), currentUserId],
-                              });
-                              toast(isFav ? "즐겨찾기 해제" : "즐겨찾기에 추가 ⭐");
-                            }}>
+                            onClick={(e) => { e.stopPropagation(); toggleFav(r); }}>
                             <Star size={16} fill={isFav ? "#F8C83A" : "none"} />
                           </div>
                         </div>
@@ -1075,7 +1063,7 @@ export default function RecipeBox() {
                       </div>
                       <div className="rb-cfoot" onClick={(e) => e.stopPropagation()}>
                         <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-                          <label className="rb-chk" onClick={() => markCookedToggle(r, update, currentUserId)}>
+                          <label className="rb-chk" onClick={() => { if (requireLogin()) markCookedToggle(r, update, currentUserId); }}>
                             <span className={`rb-box ${tried ? "on" : ""}`}>{tried && <Check size={14} />}</span>
                             만들어 봄
                           </label>
@@ -1085,10 +1073,10 @@ export default function RecipeBox() {
                                 <Star key={n} size={15} style={{ cursor: "pointer" }}
                                   fill={n <= (myLog?.rating || 0) ? "#F8C83A" : "none"}
                                   color={n <= (myLog?.rating || 0) ? "#F8C83A" : "#D0D5DD"}
-                                  onClick={() => update(r.id, {
+                                  onClick={() => { if (!requireLogin()) return; update(r.id, {
                                     cookLogs: (r.cookLogs || []).map((l) =>
                                       l.userId === currentUserId ? { ...l, rating: n } : l),
-                                  })} />
+                                  }); }} />
                               ))}
                             </div>
                           )}
@@ -1096,14 +1084,7 @@ export default function RecipeBox() {
                         <div
                           className={`rb-ico ${inCart ? "cart" : ""}`}
                           title="장보기 목록에 담기"
-                          onClick={() => {
-                            update(r.id, {
-                              inCartBy: inCart
-                                ? (r.inCartBy || []).filter((id) => id !== currentUserId)
-                                : [...(r.inCartBy || []), currentUserId],
-                            });
-                            toast(inCart ? "장보기에서 뺐어요" : "장보기에 담았어요 🛒");
-                          }}>
+                          onClick={() => toggleCart(r)}>
                           <ShoppingCart size={16} />
                         </div>
                       </div>
@@ -1135,7 +1116,7 @@ export default function RecipeBox() {
       </div>
 
       {/* FAB */}
-      <button className="rb-fab" onClick={() => setShowAdd(true)}>
+      <button className="rb-fab" onClick={() => { if (requireLogin()) setShowAdd(true); }}>
         <Plus size={24} />
       </button>
 
@@ -1146,6 +1127,7 @@ export default function RecipeBox() {
           startTimer={startTimer} pauseTimer={pauseTimer} resetTimer={resetTimer}
           onClose={() => setDetailId(null)} update={update} remove={remove}
           markCooked={markCooked} onCook={() => { setCookId(detail.id); setDetailId(null); }}
+          toggleFav={toggleFav} toggleCart={toggleCart} requireLogin={requireLogin}
         />
       )}
 
@@ -1168,16 +1150,15 @@ export default function RecipeBox() {
         />
       )}
 
-      {/* user switcher */}
-      {showUserSwitcher && (
-        <UserSwitcher
-          users={users} currentUserId={currentUserId}
-          onSwitch={(id) => { setCurrentUserId(id); setShowUserSwitcher(false); }}
-          onAdd={addUser}
-          onEdit={editUser}
-          onDelete={deleteUser}
-          onClose={() => setShowUserSwitcher(false)}
-        />
+      {/* login sheet */}
+      {showLogin && !currentUserId && (
+        <LoginSheet onClose={() => setShowLogin(false)} onSignIn={signIn} />
+      )}
+
+      {/* account menu */}
+      {showAccountMenu && currentUser && (
+        <AccountMenu user={currentUser} email={session?.user?.email}
+          onSignOut={signOut} onClose={() => setShowAccountMenu(false)} />
       )}
 
       <Toaster />
@@ -1205,7 +1186,7 @@ function markCookedToggle(r, update, currentUserId) {
 /* ------------------------------------------------------------------ */
 /*  DETAIL                                                             */
 /* ------------------------------------------------------------------ */
-function Detail({ r, timers, startTimer, pauseTimer, resetTimer, onClose, update, remove, markCooked, onCook, currentUserId, users }) {
+function Detail({ r, timers, startTimer, pauseTimer, resetTimer, onClose, update, remove, markCooked, onCook, currentUserId, users, toggleFav, toggleCart, requireLogin }) {
   const [servings, setServings] = useState(r.baseServings);
   const [editing, setEditing] = useState(false);
   const factor = servings / r.baseServings;
@@ -1251,17 +1232,10 @@ function Detail({ r, timers, startTimer, pauseTimer, resetTimer, onClose, update
               textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.title}</b>
           </div>
           <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-            <div className="rb-ico" title="편집" onClick={() => setEditing(true)}><Pencil size={15} /></div>
+            <div className="rb-ico" title="편집" onClick={() => { if (requireLogin()) setEditing(true); }}><Pencil size={15} /></div>
             <div
               className={`rb-ico ${isFav ? "on" : ""}`}
-              onClick={() => {
-                update(r.id, {
-                  favorites: isFav
-                    ? (r.favorites || []).filter((id) => id !== currentUserId)
-                    : [...(r.favorites || []), currentUserId],
-                });
-                toast(isFav ? "즐겨찾기 해제" : "즐겨찾기에 추가 ⭐");
-              }}>
+              onClick={() => toggleFav(r)}>
               <Star size={16} fill={isFav ? "#F8C83A" : "none"} />
             </div>
             <div className="rb-ico" onClick={onClose}><X size={17} /></div>
@@ -1301,17 +1275,9 @@ function Detail({ r, timers, startTimer, pauseTimer, resetTimer, onClose, update
           )}
 
           <div className="rb-row" style={{ marginTop: 18, gap: 10, flexWrap: "wrap" }}>
-            <button className="rb-btn dark" onClick={onCook}><Play size={15} /> 요리 모드 시작</button>
+            <button className="rb-btn dark" onClick={() => { if (requireLogin()) onCook(); }}><Play size={15} /> 요리 모드 시작</button>
             <button className="rb-btn" onClick={() => markCooked(r.id)}><Check size={15} /> 만들었어요 +1</button>
-            <button className={`rb-btn ${inCart ? "acc" : ""}`}
-              onClick={() => {
-                update(r.id, {
-                  inCartBy: inCart
-                    ? (r.inCartBy || []).filter((id) => id !== currentUserId)
-                    : [...(r.inCartBy || []), currentUserId],
-                });
-                toast(inCart ? "장보기에서 뺐어요" : "장보기에 담았어요 🛒");
-              }}>
+            <button className={`rb-btn ${inCart ? "acc" : ""}`} onClick={() => toggleCart(r)}>
               <ShoppingCart size={15} /> {inCart ? "장보기 담김" : "장보기 담기"}
             </button>
           </div>
@@ -1366,11 +1332,11 @@ function Detail({ r, timers, startTimer, pauseTimer, resetTimer, onClose, update
           })}
 
           {/* comments */}
-          <CommentSection r={r} users={users} currentUserId={currentUserId} update={update} />
+          <CommentSection r={r} users={users} currentUserId={currentUserId} update={update} requireLogin={requireLogin} />
 
           <div style={{ marginTop: 26, textAlign: "right" }}>
             <button className="rb-btn ghost" style={{ color: "var(--danger)" }}
-              onClick={() => { if (confirm("이 레시피를 삭제할까요?")) remove(r.id); }}>
+              onClick={() => { if (!requireLogin()) return; if (confirm("이 레시피를 삭제할까요?")) remove(r.id); }}>
               <Trash2 size={15} /> 레시피 삭제
             </button>
           </div>
@@ -1383,11 +1349,12 @@ function Detail({ r, timers, startTimer, pauseTimer, resetTimer, onClose, update
 /* ------------------------------------------------------------------ */
 /*  COMMENT SECTION                                                    */
 /* ------------------------------------------------------------------ */
-function CommentSection({ r, users, currentUserId, update }) {
+function CommentSection({ r, users, currentUserId, update, requireLogin }) {
   const [text, setText] = useState("");
   const comments = r.comments || [];
 
   const addComment = () => {
+    if (!requireLogin()) return;
     const t = text.trim();
     if (!t) return;
     const next = [...comments, { id: uid(), userId: currentUserId, text: t, createdAt: Date.now() }];
@@ -1429,17 +1396,24 @@ function CommentSection({ r, users, currentUserId, update }) {
         </div>
       )}
 
-      <div style={{ position: "relative", marginTop: 8 }}>
-        <textarea className="rb-ta" value={text} onChange={(e) => setText(e.target.value)}
-          placeholder="댓글 입력…" style={{ minHeight: 48, paddingRight: 52 }}
-          onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) addComment(); }} />
-        <button className="rb-btn acc" title="댓글 등록"
-          style={{ position: "absolute", right: 8, bottom: 8, padding: 0, width: 36, height: 36,
-            borderRadius: 999, justifyContent: "center" }}
-          disabled={!text.trim()} onClick={addComment}>
-          <Send size={16} />
+      {currentUserId ? (
+        <div style={{ position: "relative", marginTop: 8 }}>
+          <textarea className="rb-ta" value={text} onChange={(e) => setText(e.target.value)}
+            placeholder="댓글 입력…" style={{ minHeight: 48, paddingRight: 52 }}
+            onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) addComment(); }} />
+          <button className="rb-btn acc" title="댓글 등록"
+            style={{ position: "absolute", right: 8, bottom: 8, padding: 0, width: 36, height: 36,
+              borderRadius: 999, justifyContent: "center" }}
+            disabled={!text.trim()} onClick={addComment}>
+            <Send size={16} />
+          </button>
+        </div>
+      ) : (
+        <button className="rb-btn" style={{ marginTop: 8, width: "100%", justifyContent: "center" }}
+          onClick={() => requireLogin()}>
+          <LogIn size={15} /> 로그인하고 댓글 남기기
         </button>
-      </div>
+      )}
     </>
   );
 }
