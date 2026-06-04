@@ -607,8 +607,8 @@ function LoginSheet({ onClose, onSignIn }) {
 /* ------------------------------------------------------------------ */
 /*  ACCOUNT MENU                                                       */
 /* ------------------------------------------------------------------ */
-function AccountMenu({ user, email, onSignOut, onClose, onSaveProfile }) {
-  const [editing, setEditing] = useState(false);
+function AccountMenu({ user, email, onSignOut, onClose, onSaveProfile, initialEditing = false, firstSetup = false }) {
+  const [editing, setEditing] = useState(initialEditing);
   const [name, setName] = useState(user.name || "");
   const [emoji, setEmoji] = useState(user.emoji || "🧑‍🍳");
 
@@ -616,19 +616,24 @@ function AccountMenu({ user, email, onSignOut, onClose, onSaveProfile }) {
     if (!name.trim()) return;
     // 이모지 프로필 사용 → 구글 사진(avatar_url) 비움
     onSaveProfile({ name: name.trim(), emoji, avatar_url: "" });
-    setEditing(false);
+    if (firstSetup) onClose(); else setEditing(false);
   };
 
   return (
-    <div className="rb-ov" onClick={onClose}>
+    <div className="rb-ov" onClick={firstSetup ? undefined : onClose}>
       <div className="rb-sheet" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
         <div className="rb-sh-head">
-          <b style={{ fontSize: 17 }}>{editing ? "프로필 수정" : "내 계정"}</b>
-          <div className="rb-ico" onClick={onClose}><X size={17} /></div>
+          <b style={{ fontSize: 17 }}>{firstSetup ? "프로필 설정" : editing ? "프로필 수정" : "내 계정"}</b>
+          {!firstSetup && <div className="rb-ico" onClick={onClose}><X size={17} /></div>}
         </div>
         <div className="rb-sh-body">
           {editing ? (
             <>
+              {firstSetup && (
+                <p style={{ color: "var(--soft)", fontSize: 13.5, lineHeight: 1.6, marginTop: 0, marginBottom: 16, textAlign: "center" }}>
+                  처음 오셨네요! 프로필 이모지와 닉네임을 설정해 주세요.
+                </p>
+              )}
               <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
                 <UserAvatar user={{ emoji, avatar_url: "" }} size={72} />
               </div>
@@ -640,9 +645,10 @@ function AccountMenu({ user, email, onSignOut, onClose, onSaveProfile }) {
                   placeholder="예) 요리하는 유나" />
               </div>
               <label className="rb-lab">프로필 이모지</label>
-              <div className="rb-emoji-grid">
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(8, 1fr)", gap: 6, marginTop: 8 }}>
                 {EMOJIS.map((em) => (
                   <button key={em} className={`rb-emoji-btn ${emoji === em ? "on" : ""}`}
+                    style={{ width: "100%", height: "auto", aspectRatio: "1", fontSize: 19 }}
                     onClick={() => setEmoji(em)}>{em}</button>
                 ))}
               </div>
@@ -651,7 +657,7 @@ function AccountMenu({ user, email, onSignOut, onClose, onSaveProfile }) {
                   disabled={!name.trim()} onClick={save}>
                   <Check size={16} /> 저장
                 </button>
-                <button className="rb-btn" onClick={() => setEditing(false)}>취소</button>
+                {!firstSetup && <button className="rb-btn" onClick={() => setEditing(false)}>취소</button>}
               </div>
             </>
           ) : (
@@ -666,7 +672,7 @@ function AccountMenu({ user, email, onSignOut, onClose, onSaveProfile }) {
               </div>
               <button className="rb-btn" style={{ width: "100%", justifyContent: "center", marginBottom: 8 }}
                 onClick={() => { setName(user.name || ""); setEmoji(user.emoji || "🧑‍🍳"); setEditing(true); }}>
-                <Pencil size={15} /> 프로필 수정 (이모지·닉네임)
+                <Pencil size={15} /> 프로필 수정
               </button>
               <button className="rb-btn" style={{ width: "100%", justifyContent: "center" }} onClick={onSignOut}>
                 <LogOut size={15} /> 로그아웃
@@ -697,6 +703,7 @@ export default function RecipeBox() {
   const [showAdd, setShowAdd] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [showAccountMenu, setShowAccountMenu] = useState(false);
+  const [needsProfileSetup, setNeedsProfileSetup] = useState(false);
   const [timers, setTimers] = useState({});
   const [checked, setChecked] = useState({});
 
@@ -757,22 +764,36 @@ export default function RecipeBox() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  /* 로그인 시 신규 사용자만 기본 프로필 생성 (기존 커스텀 닉네임·이모지는 보존) */
+  /* 로그인 시 프로필 보장 (loaded 이후 실행 → 로드 setUsers 경합으로 덮어쓰이는 문제 방지) */
   useEffect(() => {
     const u = session?.user;
-    if (!u) return;
-    const meta = u.user_metadata || {};
-    const profile = {
-      id: u.id,
-      name: meta.full_name || meta.name || (u.email || "").split("@")[0] || "사용자",
-      emoji: "🧑‍🍳",
-      color: USER_COLORS[Math.abs(hashStr(u.id)) % USER_COLORS.length],
-      avatar_url: "",
-    };
-    // 이미 있으면 무시(ignoreDuplicates) → 사용자가 바꾼 닉네임/이모지 유지
-    supabase.from("app_users").upsert(profile, { onConflict: "id", ignoreDuplicates: true });
-    setUsers((list) => list.some((x) => x.id === u.id) ? list : [...list, profile]);
-  }, [session?.user?.id]);
+    if (!u || !loaded) return;
+    let cancelled = false;
+    (async () => {
+      const { data: rows } = await supabase.from("app_users").select("*").eq("id", u.id);
+      if (cancelled) return;
+      let row = rows && rows[0];
+      if (!row) {
+        const meta = u.user_metadata || {};
+        row = {
+          id: u.id,
+          name: meta.full_name || meta.name || (u.email || "").split("@")[0] || "사용자",
+          emoji: "🧑‍🍳",
+          color: USER_COLORS[Math.abs(hashStr(u.id)) % USER_COLORS.length],
+          avatar_url: "",
+          profile_set: false,
+        };
+        await supabase.from("app_users").insert(row);
+        if (cancelled) return;
+      }
+      setUsers((list) => list.some((x) => x.id === u.id)
+        ? list.map((x) => (x.id === u.id ? row : x))
+        : [...list, row]);
+      // 아직 프로필을 직접 설정하지 않았으면 설정 창을 먼저 표시
+      if (!row.profile_set) setNeedsProfileSetup(true);
+    })();
+    return () => { cancelled = true; };
+  }, [session?.user?.id, loaded]);
 
   /* Supabase Realtime — 다른 기기/탭의 변경을 실시간 반영 */
   useEffect(() => {
@@ -834,8 +855,12 @@ export default function RecipeBox() {
   };
   const updateProfile = (patch) => {
     if (!currentUserId) return;
-    setUsers((list) => list.map((x) => (x.id === currentUserId ? { ...x, ...patch } : x)));
-    supabase.from("app_users").update(patch).eq("id", currentUserId);
+    const full = { ...patch, profile_set: true };
+    setUsers((list) => list.some((x) => x.id === currentUserId)
+      ? list.map((x) => (x.id === currentUserId ? { ...x, ...full } : x))
+      : [...list, { id: currentUserId, color: USER_COLORS[0], ...full }]);
+    supabase.from("app_users").update(full).eq("id", currentUserId);
+    setNeedsProfileSetup(false);
     toast("프로필을 저장했어요");
   };
   /* 로그인 필요 동작 가드 — 비로그인 시 로그인 시트를 띄우고 false 반환 */
@@ -924,7 +949,7 @@ export default function RecipeBox() {
         id: currentUserId,
         name: meta.full_name || meta.name || (session.user.email || "").split("@")[0] || "사용자",
         emoji: "🧑‍🍳",
-        avatar_url: meta.avatar_url || meta.picture || "",
+        avatar_url: "",  // 구글 사진 대신 이모지 프로필 사용
       })
     : null;
 
@@ -1207,11 +1232,12 @@ export default function RecipeBox() {
         <LoginSheet onClose={() => setShowLogin(false)} onSignIn={signIn} />
       )}
 
-      {/* account menu */}
-      {showAccountMenu && currentUser && (
+      {/* account menu / 첫 로그인 프로필 설정 */}
+      {(showAccountMenu || needsProfileSetup) && currentUser && (
         <AccountMenu user={currentUser} email={session?.user?.email}
+          initialEditing={needsProfileSetup} firstSetup={needsProfileSetup}
           onSignOut={signOut} onSaveProfile={updateProfile}
-          onClose={() => setShowAccountMenu(false)} />
+          onClose={() => { setShowAccountMenu(false); setNeedsProfileSetup(false); }} />
       )}
 
       <Toaster />
