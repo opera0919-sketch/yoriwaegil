@@ -14,7 +14,7 @@ const SYSTEM_PROMPT = `너는 요리 레시피를 구조화된 JSON으로 변환
 
 export async function importRecipeWithAI(input: string): Promise<Omit<Recipe, 'id' | 'user_id'>> {
   const apiKey = process.env.EXPO_PUBLIC_GEMINI_KEY ?? '';
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
   const res = await fetch(url, {
     method: 'POST',
@@ -22,6 +22,7 @@ export async function importRecipeWithAI(input: string): Promise<Omit<Recipe, 'i
     body: JSON.stringify({
       system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
       contents: [{ role: 'user', parts: [{ text: input }] }],
+      tools: [{ google_search: {} }],
       generation_config: { temperature: 0.2 },
     }),
   });
