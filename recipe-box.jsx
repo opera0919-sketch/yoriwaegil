@@ -853,13 +853,18 @@ export default function RecipeBox() {
     setShowAccountMenu(false);
     toast("로그아웃되었어요");
   };
-  const updateProfile = (patch) => {
+  const updateProfile = async (patch) => {
     if (!currentUserId) return;
     const full = { ...patch, profile_set: true };
     setUsers((list) => list.some((x) => x.id === currentUserId)
       ? list.map((x) => (x.id === currentUserId ? { ...x, ...full } : x))
       : [...list, { id: currentUserId, color: USER_COLORS[0], ...full }]);
-    supabase.from("app_users").update(full).eq("id", currentUserId);
+    const { error } = await supabase.from("app_users").update(full).eq("id", currentUserId);
+    if (error) {
+      console.error("프로필 저장 실패:", error);
+      toast("프로필 저장에 실패했어요");
+      return;
+    }
     setNeedsProfileSetup(false);
     toast("프로필을 저장했어요");
   };
