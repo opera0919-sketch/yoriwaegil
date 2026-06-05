@@ -3,7 +3,12 @@ import { CATS, GROUPS } from '../constants/Colors';
 
 const uid = () => Math.random().toString(36).slice(2, 9);
 
-const SYSTEM_PROMPT = `너는 요리 레시피를 구조화된 JSON으로 변환하는 도구다. 사용자가 준 요리 이름, URL, 또는 붙여넣은 레시피 텍스트를 바탕으로 한국식 가정 레시피를 작성한다. 반드시 아래 JSON만 출력하고 그 외 설명·마크다운·백틱은 절대 출력하지 마라.
+const SYSTEM_PROMPT = `너는 요리 레시피를 구조화된 JSON으로 변환하는 도구다.
+중요 규칙:
+- 입력이 요리 이름이면: 반드시 그 이름을 title에 그대로 사용하라. 비슷하거나 더 유명한 다른 요리로 절대 대체하지 마라. 예) "계란국" 입력 시 title은 반드시 "계란국"이어야 한다.
+- 입력이 URL이면: 해당 페이지의 레시피 제목을 title로 사용하라.
+- 입력이 레시피 텍스트이면: 텍스트에 명시된 요리 이름을 title로 사용하라.
+반드시 아래 JSON만 출력하고 그 외 설명·마크다운·백틱은 절대 출력하지 마라.
 {"title":string,"category":"한식"|"중식"|"양식"|"일식"|"기타","description":string(한문장),"base_servings":number,"total_minutes":number,"difficulty":"쉬움"|"보통"|"어려움","tags":string[],"ingredients":[{"name":string,"amount":number,"unit":string,"grp":"채소"|"육류·해산물"|"양념·소스"|"기타"}],"steps":[{"title":string(짧게),"content":string,"timer_seconds":number|null}]}
 규칙: amount는 숫자, unit은 "g"·"개"·"큰술"·"작은술"·"대"·"모"·"공기"·"ml" 등 짧은 한국어. timer_seconds는 끓이기·삶기·재우기 등 기다림 단계에만 넣고 나머지는 null. content는 한국어로 친절하게.`;
 
@@ -17,7 +22,7 @@ export async function importRecipeWithAI(input: string): Promise<Omit<Recipe, 'i
     body: JSON.stringify({
       system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
       contents: [{ role: 'user', parts: [{ text: input }] }],
-      generation_config: { temperature: 0.3 },
+      generation_config: { temperature: 0.2 },
     }),
   });
 

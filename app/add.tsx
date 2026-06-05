@@ -54,7 +54,9 @@ export default function AddScreen() {
 function AIImport({ onAdd }: { onAdd: (r: Omit<Recipe, 'id' | 'user_id'>) => Promise<void> }) {
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
+  const [preview, setPreview] = useState<Omit<Recipe, 'id' | 'user_id'> | null>(null);
 
   const run = async () => {
     if (!input.trim()) return;
@@ -62,7 +64,7 @@ function AIImport({ onAdd }: { onAdd: (r: Omit<Recipe, 'id' | 'user_id'>) => Pro
     setErr('');
     try {
       const recipe = await importRecipeWithAI(input.trim());
-      await onAdd(recipe);
+      setPreview(recipe);
     } catch (e) {
       console.error('[AIImport] 오류:', e);
       setErr('레시피를 불러오지 못했어요. 요리 이름을 더 구체적으로 적거나 레시피 텍스트를 직접 붙여넣어 보세요.\n' + String(e));
@@ -71,13 +73,44 @@ function AIImport({ onAdd }: { onAdd: (r: Omit<Recipe, 'id' | 'user_id'>) => Pro
     }
   };
 
+  const handleConfirm = async () => {
+    if (!preview) return;
+    setSaving(true);
+    try {
+      await onAdd(preview);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (preview) {
+    return (
+      <ScrollView style={s.body} contentContainerStyle={{ paddingBottom: 40 }}>
+        <Text style={s.previewHeading}>가져온 레시피를 확인하세요</Text>
+        <RecipePreviewCard recipe={preview} />
+        <View style={s.previewActions}>
+          <TouchableOpacity style={[s.btnOutline, { flex: 1 }]} onPress={() => setPreview(null)}>
+            <Ionicons name="refresh-outline" size={16} color={Colors.ink} />
+            <Text style={s.btnOutlineText}>다시 가져오기</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[s.btnAccent, { flex: 2 }]} onPress={handleConfirm} disabled={saving}>
+            {saving
+              ? <ActivityIndicator color="#fff" />
+              : <><Ionicons name="checkmark" size={16} color="#fff" /><Text style={s.btnAccentText}>등록하기</Text></>
+            }
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    );
+  }
+
   return (
     <ScrollView style={s.body} contentContainerStyle={{ paddingBottom: 40 }}>
       <Text style={s.hint}>
         요리 이름(예: <Text style={{ fontWeight: '700' }}>알리오 올리오</Text>), 레시피{' '}
         <Text style={{ fontWeight: '700' }}>URL</Text>, 또는 레시피{' '}
         <Text style={{ fontWeight: '700' }}>전체 텍스트</Text>를 붙여넣으세요.
-        {'\n'}AI가 웹에서 찾아 재료·단계·타이머까지 자동으로 정리해 줍니다.
+        {'\n'}AI가 재료·단계·타이머까지 자동으로 정리해 줍니다.
       </Text>
       <TextInput
         style={s.textarea}
@@ -95,6 +128,72 @@ function AIImport({ onAdd }: { onAdd: (r: Omit<Recipe, 'id' | 'user_id'>) => Pro
       </TouchableOpacity>
       {err ? <Text style={{ color: Colors.accent, fontSize: 12.5, marginTop: 10, lineHeight: 18 }}>{err}</Text> : null}
     </ScrollView>
+  );
+}
+
+function RecipePreviewCard({ recipe }: { recipe: Omit<Recipe, 'id' | 'user_id'> }) {
+  const catColor = Colors.catColor[recipe.category] ?? Colors.soft;
+  return (
+    <View style={s.previewCard}>
+      <Text style={s.previewTitle}>{recipe.title}</Text>
+      <View style={s.previewMetaRow}>
+        <View style={[s.previewBadge, { backgroundColor: catColor }]}>
+          <Text style={s.previewBadgeText}>{recipe.category}</Text>
+        </View>
+        <View style={s.previewBadgeOutline}>
+          <Text style={s.previewBadgeOutlineText}>{recipe.difficulty}</Text>
+        </View>
+        <View style={s.previewBadgeOutline}>
+          <Ionicons name="time-outline" size={12} color={Colors.soft} />
+          <Text style={s.previewBadgeOutlineText}>{recipe.total_minutes}분</Text>
+        </View>
+        <View style={s.previewBadgeOutline}>
+          <Ionicons name="people-outline" size={12} color={Colors.soft} />
+          <Text style={s.previewBadgeOutlineText}>{recipe.base_servings}인분</Text>
+        </View>
+      </View>
+
+      {!!recipe.description && (
+        <Text style={s.previewDesc}>{recipe.description}</Text>
+      )}
+
+      {recipe.tags.length > 0 && (
+        <View style={s.previewTagRow}>
+          {recipe.tags.map((t) => (
+            <View key={t} style={s.previewTag}>
+              <Text style={s.previewTagText}>#{t}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+
+      <View style={s.previewSection}>
+        <Text style={s.previewSectionTitle}>재료 {recipe.ingredients.length}가지</Text>
+        {recipe.ingredients.map((ing) => (
+          <View key={ing.id} style={s.previewIngRow}>
+            <Text style={s.previewIngName}>{ing.name}</Text>
+            <Text style={s.previewIngAmount}>
+              {ing.amount > 0 ? `${ing.amount} ${ing.unit}` : ing.unit || '-'}
+            </Text>
+          </View>
+        ))}
+      </View>
+
+      <View style={s.previewSection}>
+        <Text style={s.previewSectionTitle}>조리 {recipe.steps.length}단계</Text>
+        {recipe.steps.map((step, idx) => (
+          <View key={step.id} style={s.previewStepRow}>
+            <View style={s.previewStepNum}>
+              <Text style={s.previewStepNumText}>{idx + 1}</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              {!!step.title && <Text style={s.previewStepTitle}>{step.title}</Text>}
+              <Text style={s.previewStepContent} numberOfLines={2}>{step.content}</Text>
+            </View>
+          </View>
+        ))}
+      </View>
+    </View>
   );
 }
 
@@ -252,6 +351,12 @@ const s = StyleSheet.create({
     backgroundColor: Colors.accent, borderRadius: 14, padding: 15,
   },
   btnAccentText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  btnOutline: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    borderWidth: 1.5, borderColor: Colors.ink, borderRadius: 14, padding: 15,
+    backgroundColor: Colors.card,
+  },
+  btnOutlineText: { color: Colors.ink, fontWeight: '600', fontSize: 15 },
   label: { fontSize: 12, color: Colors.soft, marginBottom: 6, marginTop: 2 },
   input: {
     borderWidth: 1, borderColor: Colors.line, borderRadius: 11,
@@ -276,4 +381,43 @@ const s = StyleSheet.create({
     padding: 10, marginBottom: 8, backgroundColor: Colors.card,
   },
   stepNum: { fontSize: 14, fontWeight: '700', color: Colors.ink, width: 20, textAlign: 'center' },
+
+  // Preview
+  previewHeading: { fontSize: 13, color: Colors.soft, marginBottom: 10 },
+  previewCard: {
+    backgroundColor: Colors.card,
+    borderRadius: 16, borderWidth: 1, borderColor: Colors.line,
+    padding: 16, marginBottom: 4,
+  },
+  previewTitle: { fontSize: 20, fontWeight: '700', color: Colors.ink, marginBottom: 10 },
+  previewMetaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 },
+  previewBadge: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
+  previewBadgeText: { fontSize: 12, color: '#fff', fontWeight: '600' },
+  previewBadgeOutline: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    borderWidth: 1, borderColor: Colors.line, borderRadius: 8,
+    paddingHorizontal: 8, paddingVertical: 4, backgroundColor: Colors.paper,
+  },
+  previewBadgeOutlineText: { fontSize: 12, color: Colors.soft },
+  previewDesc: { fontSize: 13, color: Colors.soft, lineHeight: 19, marginBottom: 8 },
+  previewTagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginBottom: 10 },
+  previewTag: { backgroundColor: Colors.paper, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
+  previewTagText: { fontSize: 12, color: Colors.soft },
+  previewSection: { marginTop: 12 },
+  previewSectionTitle: { fontSize: 13, fontWeight: '700', color: Colors.ink, marginBottom: 6 },
+  previewIngRow: {
+    flexDirection: 'row', justifyContent: 'space-between',
+    paddingVertical: 5, borderBottomWidth: 1, borderBottomColor: Colors.line,
+  },
+  previewIngName: { fontSize: 13, color: Colors.ink },
+  previewIngAmount: { fontSize: 13, color: Colors.soft },
+  previewStepRow: { flexDirection: 'row', gap: 10, paddingVertical: 6 },
+  previewStepNum: {
+    width: 22, height: 22, borderRadius: 11, backgroundColor: Colors.ink,
+    alignItems: 'center', justifyContent: 'center', marginTop: 1, flexShrink: 0,
+  },
+  previewStepNumText: { fontSize: 11, fontWeight: '700', color: '#fff' },
+  previewStepTitle: { fontSize: 13, fontWeight: '600', color: Colors.ink, marginBottom: 2 },
+  previewStepContent: { fontSize: 12.5, color: Colors.soft, lineHeight: 18 },
+  previewActions: { flexDirection: 'row', gap: 10, marginTop: 14 },
 });
