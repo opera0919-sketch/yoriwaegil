@@ -364,8 +364,19 @@ const PATCH_MAP = {
   sourceUrl: "source_url",
   sourceTitle: "source_title",
 };
+// UPDATE 가능한 실제 컬럼만 허용 (id/createdAt 등 비컬럼·키 제외)
+const RECIPE_COLUMNS = new Set([
+  "category", "title", "description", "base_servings", "total_minutes",
+  "difficulty", "tags", "ingredients", "steps", "created_by", "updated_by",
+  "favorites", "in_cart_by", "notes", "comments", "cook_logs",
+  "source_url", "source_title", "version",
+]);
 const patchToRow = (patch) =>
-  Object.fromEntries(Object.entries(patch).map(([k, v]) => [PATCH_MAP[k] || k, v]));
+  Object.fromEntries(
+    Object.entries(patch)
+      .map(([k, v]) => [PATCH_MAP[k] || k, v])
+      .filter(([k]) => RECIPE_COLUMNS.has(k))
+  );
 
 /* ------------------------------------------------------------------ */
 /*  TOAST BUS  (전역 — prop drilling 없이 어디서든 toast() 호출)        */
