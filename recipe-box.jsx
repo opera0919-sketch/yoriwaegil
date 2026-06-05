@@ -876,18 +876,31 @@ export default function RecipeBox() {
   };
 
   /* helpers */
-  const update = (id, patch) => {
-    setRecipes((r) => r.map((x) => (x.id === id ? { ...x, ...patch } : x)));
-    supabase.from("recipes").update(patchToRow(patch)).eq("id", id);
+  const update = async (id, patch) => {
+    let prev;
+    setRecipes((r) => { prev = r.find((x) => x.id === id); return r.map((x) => (x.id === id ? { ...x, ...patch } : x)); });
+    const { error } = await supabase.from("recipes").update(patchToRow(patch)).eq("id", id);
+    if (error) {
+      console.error("레시피 수정 실패:", error);
+      if (prev) setRecipes((r) => r.map((x) => (x.id === id ? prev : x)));
+      toast("변경 저장에 실패했어요");
+    }
   };
-  const remove = (id) => {
+  const remove = async (id) => {
     if (!requireLogin()) return;
-    setRecipes((r) => r.filter((x) => x.id !== id));
+    let removed;
+    setRecipes((r) => { removed = r.find((x) => x.id === id); return r.filter((x) => x.id !== id); });
     setDetailId(null);
-    supabase.from("recipes").delete().eq("id", id);
+    const { error } = await supabase.from("recipes").delete().eq("id", id);
+    if (error) {
+      console.error("레시피 삭제 실패:", error);
+      if (removed) setRecipes((r) => r.some((x) => x.id === id) ? r : [removed, ...r]);
+      toast("삭제에 실패했어요");
+      return;
+    }
     toast("레시피를 삭제했어요");
   };
-  const addRecipe = (r) => {
+  const addRecipe = async (r) => {
     if (!requireLogin()) return;
     const recipe = {
       ...r, id: uid(),
@@ -896,7 +909,13 @@ export default function RecipeBox() {
       createdAt: Date.now(),
     };
     setRecipes((prev) => [recipe, ...prev]);
-    supabase.from("recipes").insert(toRow(recipe));
+    const { error } = await supabase.from("recipes").insert(toRow(recipe));
+    if (error) {
+      console.error("레시피 추가 실패:", error);
+      setRecipes((prev) => prev.filter((x) => x.id !== recipe.id));
+      toast("저장에 실패했어요");
+      return;
+    }
     toast(`'${recipe.title}' 저장됨`);
   };
   const toggleFav = (r) => {
