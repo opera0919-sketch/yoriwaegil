@@ -1804,9 +1804,13 @@ URL이나 요리 이름만 주어지면 구글 검색을 통해 신뢰할 수 �
       const clean = text.replace(/```json|```/g, "").trim();
       const m = clean.match(/\{[\s\S]*\}/);
       let jsonStr = m ? m[0] : clean;
-      // 안전망: 숫자 필드에 비숫자 unquoted 값(예: "amount":적당히)이 오면 null로 복구
+      // 안전망: amount의 비정상 값(분수 1/2·범위 2~3·"적당히" 등)은 문자열로 감싸 JSON 유효화 → parseAmount가 복원
       jsonStr = jsonStr
-        .replace(/("amount"\s*:\s*)(?!-?\d|null|")([^,}\]]+)/g, "$10")
+        .replace(/("amount"\s*:\s*)([^,}\]]+)/g, (_m, p, val) => {
+          const t = val.trim();
+          if (/^-?\d*\.?\d+$/.test(t) || t === "null" || (t.startsWith('"') && t.endsWith('"'))) return p + t;
+          return p + JSON.stringify(t);
+        })
         .replace(/("(?:baseServings|totalMinutes|timerSeconds)"\s*:\s*)(?!-?\d|null|")([^,}\]]+)/g, "$1null");
       const obj = JSON.parse(jsonStr);
       const recipe = normalize(obj, currentUserId, source);
@@ -1836,6 +1840,36 @@ URL이나 요리 이름만 주어지면 구글 검색을 통해 신뢰할 수 �
   );
 }
 
+// 분량 파싱: 숫자/분수("1/2")/범위("2~3","2-3")/혼합("1과 1/2")/문자열 안 숫자 추출
+function parseAmount(v) {
+  if (typeof v === "number") return isFinite(v) ? v : 0;
+  if (v == null) return 0;
+  let s = String(v).trim().replace(/\s+/g, " ");
+  if (!s) return 0;
+  // 범위(2~3, 2-3, 2.5-3)는 하한값 사용
+  const range = s.match(/^(-?\d*\.?\d+(?:\/\d+)?)\s*[~\-–]\s*(-?\d*\.?\d+(?:\/\d+)?)/);
+  if (range) s = range[1];
+  const toNum = (str) => {
+    str = str.trim();
+    let total = 0, matched = false;
+    // "1과 1/2", "1 1/2" 같은 정수+분수 혼합 및 단일 분수/소수
+    for (const tok of str.split(/\s*과\s*|\s+/)) {
+      const frac = tok.match(/^(-?\d+)\/(\d+)$/);
+      if (frac) { total += Number(frac[1]) / Number(frac[2]); matched = true; continue; }
+      const num = tok.match(/^-?\d*\.?\d+$/);
+      if (num) { total += Number(tok); matched = true; }
+    }
+    return matched ? total : NaN;
+  };
+  let n = toNum(s);
+  if (!isFinite(n)) {
+    // 마지막 안전망: 문자열 어디든 첫 숫자/분수 추출
+    const m = s.match(/(\d+\/\d+|\d*\.?\d+)/);
+    n = m ? toNum(m[1]) : 0;
+  }
+  return isFinite(n) ? n : 0;
+}
+
 function normalize(obj, createdBy, source = {}) {
   return {
     title: obj.title || "제목 없는 레시피",
@@ -1849,7 +1883,7 @@ function normalize(obj, createdBy, source = {}) {
     sourceUrl: source.url || "", sourceTitle: source.title || "",
     favorites: [], inCartBy: [], notes: {}, comments: [], cookLogs: [],
     ingredients: (obj.ingredients || []).map((i) => ({
-      id: uid(), name: i.name || "", amount: Number(i.amount) || 0,
+      id: uid(), name: i.name || "", amount: parseAmount(i.amount),
       unit: i.unit || "", group: GROUPS.includes(i.group) ? i.group : "기타",
     })),
     steps: (obj.steps || []).map((s) => ({
