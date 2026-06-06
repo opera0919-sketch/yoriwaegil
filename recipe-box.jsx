@@ -1792,6 +1792,13 @@ function AIImport({ onAdd, currentUserId }) {
       return;
     }
 
+    // 영상 링크는 모델이 내용을 읽지 못해(검색 그라운딩은 영상을 전사하지 못함) 처리 불가 → 명확히 안내
+    if (/youtube\.com|youtu\.be|vimeo\.com|tiktok\.com|instagram\.com\/(?:reel|p)\//i.test(input)) {
+      setErr("영상 링크(유튜브 등)는 아직 지원하지 않아요. 영상 설명란의 레시피 텍스트를 붙여넣거나, 요리 이름 또는 글 형태의 레시피 URL을 입력해 주세요.");
+      setBusy(false);
+      return;
+    }
+
     const sys = `너는 요리 레시피를 구조화된 JSON으로 변환하는 전문가야.
 사용자가 준 요리 이름, URL, 또는 레시피 텍스트를 바탕으로 레시피를 작성해.
 URL이나 요리 이름만 주어지면 구글 검색을 통해 신뢰할 수 있는 정보를 찾아 한국식 가정 레시피로 재구성해.
@@ -2010,8 +2017,10 @@ function ManualForm({ onSubmit, currentUserId, initial, submitLabel = "레시피
     title: initial.title, category: initial.category, description: initial.description || "",
     baseServings: initial.baseServings, totalMinutes: initial.totalMinutes,
     difficulty: initial.difficulty, tags: (initial.tags || []).join(", "),
+    sourceUrl: initial.sourceUrl || "", sourceTitle: initial.sourceTitle || "",
   } : {
     title: "", category: "한식", description: "", baseServings: 2, totalMinutes: 30, difficulty: "보통", tags: "",
+    sourceUrl: "", sourceTitle: "",
   });
   const [ings, setIngs] = useState(initial && initial.ingredients?.length
     ? initial.ingredients.map((i) => ({ id: i.id || uid(), name: i.name, amount: String(i.amount), unit: i.unit, group: i.group }))
@@ -2065,6 +2074,14 @@ function ManualForm({ onSubmit, currentUserId, initial, submitLabel = "레시피
         <input className="rb-in" value={f.description} onChange={(e) => set("description", e.target.value)} /></div>
       <div className="rb-field"><label className="rb-lab">태그 (쉼표로 구분)</label>
         <input className="rb-in" value={f.tags} onChange={(e) => set("tags", e.target.value)} placeholder="매운맛, 간단" /></div>
+      {initial && (
+        <div className="rb-row" style={{ gap: 12 }}>
+          <div className="rb-field" style={{ flex: 2 }}><label className="rb-lab">출처 링크 (citation)</label>
+            <input className="rb-in" value={f.sourceUrl} onChange={(e) => set("sourceUrl", e.target.value)} placeholder="https://..." /></div>
+          <div className="rb-field" style={{ flex: 1 }}><label className="rb-lab">출처 제목</label>
+            <input className="rb-in" value={f.sourceTitle} onChange={(e) => set("sourceTitle", e.target.value)} placeholder="원문 제목" /></div>
+        </div>
+      )}
 
       <label className="rb-lab" style={{ marginTop: 6 }}>재료</label>
       {ings.map((it) => (
