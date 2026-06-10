@@ -79,34 +79,46 @@ title은 영상에서 만드는 요리 이름으로 정하라(영상 제목의 �
 ${SCHEMA_RULES}`;
 
 // 유튜브 영상을 Gemini가 직접(화면+음성) 분석. 저해상도로 영상 토큰 절약(무료 플랜 한도 보호).
+// 1차: JSON 모드(responseMimeType)로 마크다운 펜스 없는 순수 JSON 응답 강제 → 클라이언트 파싱 실패율 감소.
+// JSON 모드가 거부되거나 오류면 일반 모드로 1회 재시도(기존 동작과 동일).
 async function callGeminiVideo(videoUrl: string) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
-  const body = {
-    systemInstruction: { parts: [{ text: SYS_VIDEO }] },
-    contents: [
-      {
-        role: "user",
-        parts: [
-          { fileData: { fileUri: videoUrl } },
-          { text: "이 요리 영상을 보고 레시피를 위 형식의 JSON으로 정리해줘." },
-        ],
-      },
-    ],
-    generationConfig: { mediaResolution: "MEDIA_RESOLUTION_LOW" },
+  const attempt = async (jsonMode: boolean) => {
+    const body = {
+      systemInstruction: { parts: [{ text: SYS_VIDEO }] },
+      contents: [
+        {
+          role: "user",
+          parts: [
+            { fileData: { fileUri: videoUrl } },
+            { text: "이 요리 영상을 보고 레시피를 위 형식의 JSON으로 정리해줘." },
+          ],
+        },
+      ],
+      generationConfig: jsonMode
+        ? { mediaResolution: "MEDIA_RESOLUTION_LOW", responseMimeType: "application/json" }
+        : { mediaResolution: "MEDIA_RESOLUTION_LOW" },
+    };
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const e = await res.json().catch(() => ({}));
+      throw new Error(`Gemini-video ${res.status}: ${(e as { error?: { message?: string } })?.error?.message ?? ""}`);
+    }
+    const data = await res.json();
+    const cand = data.candidates?.[0];
+    const text: string = (cand?.content?.parts ?? []).map((p: { text?: string }) => p.text ?? "").join("\n");
+    return text;
   };
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    const e = await res.json().catch(() => ({}));
-    throw new Error(`Gemini-video ${res.status}: ${(e as { error?: { message?: string } })?.error?.message ?? ""}`);
+  try {
+    return { text: await attempt(true) };
+  } catch (e) {
+    console.error("video JSON-mode failed, retrying plain:", e);
+    return { text: await attempt(false) };
   }
-  const data = await res.json();
-  const cand = data.candidates?.[0];
-  const text: string = (cand?.content?.parts ?? []).map((p: { text?: string }) => p.text ?? "").join("\n");
-  return { text };
 }
 
 async function callGemini(sys: string, userText: string, useSearch: boolean) {
