@@ -77,11 +77,11 @@
 5. ✅ B1: supabase-js 번들링(bare import 전환)
 6. ✅ B2: 폰트 dynamic-subset preload / ✅ B3: 초기 쿼리 병렬화 / ✅ B4: 검색 중 애니메이션 지연 제거
 
-### Phase 3 — 핵심 UX (1~2일)
-7. C1: 타이머 timestamp화 + Wake Lock + 종료 알림
-8. C3: 유튜브 썸네일 카드
-9. C4: AI 가져오기 진행 표시 + 타임아웃 + 미리보기 편집
-10. C5: 해시 라우팅 + 뒤로가기 닫기
+### Phase 3 — 핵심 UX ✅ 완료 (2026-06-10)
+7. ✅ C1: 타이머 endAt(절대시각) 기준 계산 + 요리모드 Wake Lock + 백그라운드 종료 알림(Notification)
+8. ✅ C3: 유튜브 출처 레시피 카드 썸네일 (sourceUrl에서 파생, 추가 저장 없음)
+9. ✅ C4: AI 가져오기 단계별 진행 표시·경과 초 + 90초 타임아웃 + 미리보기 "수정해서 등록"
+10. ✅ C5: 해시 라우팅(#/recipe/:id, #/cook/:id) — 상세 링크 공유 + 뒤로가기로 화면 닫기
 
 ### Phase 4 — 마감·품질 (점진)
 11. E3: Gemini JSON 스키마 응답 / E1: PR 빌드 CI / E2: 죽은 코드 정리
