@@ -23,6 +23,12 @@ const CSS = `
   --danger: #F04452;
   --line: #E5E8EB;
   --gold: #F8C83A;
+  --accent-soft: #EBF2FF;
+  --muted: #F2F4F6;
+  --field: #F9FAFB;
+  --gold-bg: #FFFBE6;
+  --timer-bg: #F8FAFF;
+  --body: #4A5568;
   --font: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-family: var(--font);
   color: var(--ink);
@@ -89,7 +95,7 @@ const CSS = `
 .rb-meta { display:flex; gap:12px; margin-top:12px; font-size:11.5px; color:var(--soft); flex-wrap:wrap; }
 .rb-meta span { display:flex; gap:4px; align-items:center; }
 .rb-tags { display:flex; gap:5px; flex-wrap:wrap; margin-top:10px; }
-.rb-tag { font-size:10.5px; color:var(--accent); background:#EBF2FF; border-radius:999px; padding:2px 9px; }
+.rb-tag { font-size:10.5px; color:var(--accent); background:var(--accent-soft); border-radius:999px; padding:2px 9px; }
 .rb-cfoot { display:flex; align-items:center; justify-content:space-between;
   padding:10px 14px; border-top:1px solid var(--line); }
 .rb-cat-badge { display:inline-block; font-size:11px; font-weight:700;
@@ -103,15 +109,15 @@ const CSS = `
 .rb-btn:hover { border-color:var(--accent); }
 .rb-btn.acc { background:var(--accent); color:#fff; border-color:transparent; }
 .rb-btn.acc:hover { background:var(--accent-d); }
-.rb-btn.dark { background:var(--ink); color:#F9FAFB; border-color:transparent; }
+.rb-btn.dark { background:var(--ink); color:var(--bg); border-color:transparent; }
 .rb-btn.ghost { background:transparent; border-color:transparent; }
 .rb-btn:disabled { opacity:.5; cursor:not-allowed; }
 .rb-ico { width:34px; height:34px; border-radius:999px; border:1.5px solid var(--line);
   background:var(--card); display:grid; place-items:center; cursor:pointer;
-  color:var(--soft); transition:.16s; flex:none; }
+  color:var(--soft); transition:.16s; flex:none; padding:0; font-family:var(--font); }
 .rb-ico:hover { color:var(--ink); border-color:var(--accent); }
-.rb-ico.on { color:var(--gold); border-color:var(--gold); background:#FFFBE6; }
-.rb-ico.cart { color:var(--accent); border-color:var(--accent); background:#EBF2FF; }
+.rb-ico.on { color:var(--gold); border-color:var(--gold); background:var(--gold-bg); }
+.rb-ico.cart { color:var(--accent); border-color:var(--accent); background:var(--accent-soft); }
 
 /* FAB */
 .rb-fab { position:fixed; right:22px; bottom:32px; z-index:40;
@@ -146,16 +152,16 @@ const CSS = `
 .rb-num { width:27px; height:27px; flex:none; border-radius:9px; background:var(--accent);
   color:#fff; display:grid; place-items:center; font-size:13px; font-weight:700; margin-top:1px; }
 .rb-step-t { font-weight:700; font-size:15px; margin-bottom:3px; }
-.rb-step-c { font-size:13.5px; color:#4A5568; line-height:1.6; }
+.rb-step-c { font-size:13.5px; color:var(--body); line-height:1.6; }
 
 /* timer */
 .rb-timer { margin-top:11px; display:inline-flex; align-items:center; gap:10px;
-  background:#F8FAFF; border:1.5px solid var(--line); border-radius:12px; padding:7px 8px 7px 14px; }
-.rb-timer.run { border-color:var(--accent); background:#EBF2FF; }
+  background:var(--timer-bg); border:1.5px solid var(--line); border-radius:12px; padding:7px 8px 7px 14px; }
+.rb-timer.run { border-color:var(--accent); background:var(--accent-soft); }
 .rb-tval { font-size:18px; font-weight:700; letter-spacing:.5px; min-width:62px; }
 .rb-tval.warn { color:var(--danger); animation:rb-blink 1s infinite; }
 .rb-tbtn { width:30px; height:30px; border-radius:999px; border:0; cursor:pointer;
-  display:grid; place-items:center; background:var(--ink); color:#F9FAFB; }
+  display:grid; place-items:center; background:var(--ink); color:var(--bg); }
 .rb-tbtn.g { background:transparent; color:var(--soft); border:1.5px solid var(--line); }
 
 /* serving */
@@ -163,7 +169,7 @@ const CSS = `
   border-radius:999px; overflow:hidden; }
 .rb-serv button { width:32px; height:32px; border:0; background:transparent; cursor:pointer;
   color:var(--ink); display:grid; place-items:center; }
-.rb-serv button:hover { background:#F2F4F6; }
+.rb-serv button:hover { background:var(--muted); }
 .rb-serv b { font-weight:700; padding:0 13px; font-size:15px; }
 
 /* fields */
@@ -171,7 +177,7 @@ const CSS = `
 .rb-lab { font-size:12px; color:var(--soft); margin-bottom:6px; display:block;
   font-weight:600; letter-spacing:.3px; }
 .rb-in,.rb-ta,.rb-sel { width:100%; border:1.5px solid var(--line); border-radius:12px;
-  background:#F9FAFB; padding:11px 13px; font-family:var(--font); font-size:14px;
+  background:var(--field); padding:11px 13px; font-family:var(--font); font-size:14px;
   color:var(--ink); outline:0; }
 .rb-in:focus,.rb-ta:focus,.rb-sel:focus { border-color:var(--accent); background:var(--card); }
 .rb-ta { resize:vertical; min-height:96px; line-height:1.6; }
@@ -188,7 +194,7 @@ const CSS = `
 .rb-cook-step { font-size:12px; font-weight:700; color:var(--accent);
   letter-spacing:1.5px; text-transform:uppercase; }
 .rb-cook-t { font-size:28px; font-weight:700; margin:10px 0 18px; line-height:1.2; }
-.rb-cook-c { font-size:17px; line-height:1.75; color:#4A5568; }
+.rb-cook-c { font-size:17px; line-height:1.75; color:var(--body); }
 .rb-bigtimer { font-size:62px; font-weight:700; letter-spacing:2px; margin:26px 0 10px; }
 .rb-bigtimer.warn { color:var(--danger); animation:rb-blink 1s infinite; }
 .rb-cook-f { display:flex; justify-content:space-between; align-items:center;
@@ -212,8 +218,8 @@ const CSS = `
 .rb-srcpill { display:inline-flex; align-items:center; gap:8px; background:var(--card);
   border:1.5px solid var(--line); border-radius:999px; padding:7px 8px 7px 13px; font-size:13px; }
 
-.rb-note { background:#F2F4F6; border-radius:13px; padding:13px; }
-.rb-other-notes { background:#F2F4F6; border-radius:12px; padding:12px 14px; margin-top:8px; }
+.rb-note { background:var(--muted); border-radius:13px; padding:13px; }
+.rb-other-notes { background:var(--muted); border-radius:12px; padding:12px 14px; margin-top:8px; }
 .rb-other-note-item { display:flex; gap:10px; align-items:flex-start; padding:8px 0;
   border-bottom:1px solid rgba(0,0,0,.06); }
 .rb-other-note-item:last-child { border-bottom:none; }
@@ -233,8 +239,8 @@ const CSS = `
 /* emoji picker */
 .rb-emoji-grid { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
 .rb-emoji-btn { width:42px; height:42px; border-radius:12px; border:1.5px solid var(--line);
-  background:#F9FAFB; font-size:22px; cursor:pointer; display:grid; place-items:center; transition:.15s; }
-.rb-emoji-btn:hover,.rb-emoji-btn.on { border-color:var(--accent); background:#EBF2FF; }
+  background:var(--field); font-size:22px; cursor:pointer; display:grid; place-items:center; transition:.15s; }
+.rb-emoji-btn:hover,.rb-emoji-btn.on { border-color:var(--accent); background:var(--accent-soft); }
 
 /* select custom arrow (테두리 톤에 맞춘 회색) */
 .rb-sel { appearance:none; -webkit-appearance:none; -moz-appearance:none; padding-right:34px;
@@ -270,9 +276,11 @@ const CSS = `
 /* toast */
 .rb-toaster { position:fixed; left:50%; bottom:28px; transform:translateX(-50%); z-index:80;
   display:flex; flex-direction:column; gap:8px; align-items:center; pointer-events:none; }
-.rb-toast { background:var(--ink); color:#fff; padding:11px 18px; border-radius:999px;
+.rb-toast { background:#191F28; color:#fff; padding:11px 18px; border-radius:999px;
   font-size:13.5px; font-weight:600; box-shadow:0 6px 24px rgba(0,0,0,.25);
   display:flex; align-items:center; gap:8px; max-width:90vw; animation:rb-toast-in .22s both; }
+.rb-toast-act { background:none; border:none; color:#7CB1FF; font-weight:700; font-size:13px;
+  cursor:pointer; padding:0 2px; font-family:inherit; flex:none; }
 @keyframes rb-toast-in { from{opacity:0; transform:translateY(12px) scale(.96);} to{opacity:1; transform:none;} }
 
 @keyframes rb-up { from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:none;} }
@@ -281,6 +289,29 @@ const CSS = `
 @keyframes rb-blink { 50%{opacity:.4;} }
 .rb-spin { animation:rb-spin 1s linear infinite; }
 @keyframes rb-spin { to{transform:rotate(360deg);} }
+
+/* 다크 모드 — 시스템 설정 따름 */
+@media (prefers-color-scheme: dark) {
+  .rb {
+    --bg: #101317;
+    --card: #1A1F27;
+    --ink: #E8ECF1;
+    --soft: #94A0AD;
+    --accent: #4B92F8;
+    --accent-d: #2F7DEB;
+    --line: #2A313B;
+    --accent-soft: #1B2C49;
+    --muted: #232A33;
+    --field: #12151A;
+    --gold-bg: #3A331C;
+    --timer-bg: #19202C;
+    --body: #AEB8C4;
+  }
+  .rb-search { box-shadow:0 2px 10px rgba(0,0,0,.35); }
+  .rb-card { box-shadow:0 2px 12px rgba(0,0,0,.3); }
+  .rb-card:hover { box-shadow:0 12px 28px rgba(0,0,0,.45); }
+  .rb-shop-item,.rb-shop-recipe { box-shadow:0 1px 6px rgba(0,0,0,.3); }
+}
 `;
 
 /* ------------------------------------------------------------------ */
@@ -289,12 +320,10 @@ const CSS = `
 const CATS = ["한식", "중식", "양식", "일식", "기타"];
 const CAT_COLOR = { 한식: "#BE4329", 중식: "#C98A2B", 양식: "#6F7A52", 일식: "#4A6C7A", 기타: "#8A6D8B" };
 const GROUPS = ["채소", "육류·해산물", "양념·소스", "기타"];
-const STORE_CURUSER_KEY = "recipebox:v1:currentUser";
 const STORE_SHOP_CHECKED_KEY = "recipebox:v1:shopChecked";
 const STORE_SHOP_SERVINGS_KEY = "recipebox:v1:shopServings";
+const STORE_CACHE_KEY = "recipebox:v1:cache";
 
-const DEFAULT_USER_ID = "user_chaeyuna";
-const DEFAULT_USER = { id: DEFAULT_USER_ID, name: "채유나", emoji: "🧑‍🍳", color: "#3182F6" };
 const USER_COLORS = ["#3182F6","#F04452","#00B493","#F8971D","#8B5CF6","#EC4899","#14B8A6","#F59E0B"];
 
 /* Supabase */
@@ -302,11 +331,6 @@ const SUPABASE_URL = "https://fbkriifozbwuaoegmmcf.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZia3JpaWZvemJ3dWFvZWdtbWNmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0NTk4MTYsImV4cCI6MjA5NjAzNTgxNn0.YGktdDGIYXVvIqdSrmhkG8um-zjZtHoRhWG4EQV60HU";
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-/* localStorage — currentUserId만 탭별로 유지 */
-const localStore = {
-  loadCurrentUser: () => { try { return localStorage.getItem(STORE_CURUSER_KEY); } catch (e) { return null; } },
-  saveCurrentUser: (id) => { try { localStorage.setItem(STORE_CURUSER_KEY, id); } catch (e) {} },
-};
 /* 장보기 체크·인분 등 JSON 상태 보존 — 마트에서 새로고침해도 유지 */
 const loadJSON = (key, fallback) => { try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch (e) { return fallback; } };
 const saveJSON = (key, val) => { try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {} };
@@ -388,9 +412,25 @@ const patchToRow = (patch) =>
 /*  TOAST BUS  (전역 — prop drilling 없이 어디서든 toast() 호출)        */
 /* ------------------------------------------------------------------ */
 const toastListeners = new Set();
-const toast = (msg) => toastListeners.forEach((fn) => fn(msg));
+/* toast(msg) 또는 toast(msg, { actionLabel, action, duration }) — action 버튼 지원(실행취소 등) */
+const toast = (msg, opts) => toastListeners.forEach((fn) => fn(msg, opts));
 
 const uid = () => Math.random().toString(36).slice(2, 9);
+
+/* 초성 검색: "ㄱㅊㅉㄱ" → "김치찌개" 매칭 */
+const CHO = ["ㄱ","ㄲ","ㄴ","ㄷ","ㄸ","ㄹ","ㅁ","ㅂ","ㅃ","ㅅ","ㅆ","ㅇ","ㅈ","ㅉ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ"];
+const toCho = (s) => [...s].map((ch) => {
+  const c = ch.charCodeAt(0) - 0xac00;
+  return c >= 0 && c < 11172 ? CHO[Math.floor(c / 588)] : ch;
+}).join("");
+const matchKo = (text, query) => {
+  const t = text.toLowerCase(), q = query.toLowerCase().trim();
+  if (!q) return true;
+  if (t.includes(q)) return true;
+  // 검색어가 초성으로만 이뤄졌으면 본문의 초성열과 비교
+  if (/^[ㄱ-ㅎ\s]+$/.test(q)) return toCho(t).includes(q.replace(/\s/g, ""));
+  return false;
+};
 const hashStr = (s) => { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return h; };
 const fmt = (n) => {
   if (n == null || isNaN(n)) return "";
@@ -435,136 +475,15 @@ const beep = () => {
 };
 
 /* ------------------------------------------------------------------ */
-/*  DATA MIGRATION                                                     */
-/* ------------------------------------------------------------------ */
-function migrateRecipes(recipes, uid) {
-  return recipes.map((r) => {
-    if (r.favorites !== undefined) return r;
-    return {
-      ...r,
-      createdBy: uid,
-      updatedBy: uid,
-      favorites: r.favorite ? [uid] : [],
-      inCartBy: r.inCart ? [uid] : [],
-      notes: { [uid]: r.note || "" },
-      cookLogs:
-        r.cookCount > 0 || r.tried
-          ? [{ userId: uid, count: Math.max(r.tried ? 1 : 0, r.cookCount || 0), lastCookedAt: r.lastCookedAt || null }]
-          : [],
-      favorite: undefined,
-      inCart: undefined,
-      note: undefined,
-      tried: undefined,
-      cookCount: undefined,
-      lastCookedAt: undefined,
-    };
-  });
-}
-
-/* ------------------------------------------------------------------ */
-/*  SAMPLE DATA                                                        */
-/* ------------------------------------------------------------------ */
-const seed = () => [
-  {
-    id: uid(), category: "한식", title: "두찜 스타일 실비 한우곱 찜닭",
-    description: "매콤한 실비 양념에 쫄깃한 한우곱창과 닭, 당면을 넣어 졸인 집밥 찜닭.",
-    baseServings: 3, totalMinutes: 50, difficulty: "보통", tags: ["매운맛", "곱창", "당면"],
-    createdBy: DEFAULT_USER_ID, updatedBy: DEFAULT_USER_ID,
-    favorites: [DEFAULT_USER_ID], inCartBy: [],
-    notes: { [DEFAULT_USER_ID]: "다음엔 청양고추 8개, 치즈 마무리." },
-    cookLogs: [{ userId: DEFAULT_USER_ID, count: 2, lastCookedAt: Date.now() - 86400000 * 4 }],
-    ingredients: [
-      { id: uid(), name: "닭볶음탕용 닭", amount: 800, unit: "g", group: "육류·해산물" },
-      { id: uid(), name: "손질된 한우곱창", amount: 300, unit: "g", group: "육류·해산물" },
-      { id: uid(), name: "당면", amount: 120, unit: "g", group: "기타" },
-      { id: uid(), name: "양파", amount: 1, unit: "개", group: "채소" },
-      { id: uid(), name: "대파", amount: 2, unit: "대", group: "채소" },
-      { id: uid(), name: "청양고추", amount: 6, unit: "개", group: "채소" },
-      { id: uid(), name: "진간장", amount: 7, unit: "큰술", group: "양념·소스" },
-      { id: uid(), name: "고춧가루", amount: 4, unit: "큰술", group: "양념·소스" },
-      { id: uid(), name: "다진 마늘", amount: 2, unit: "큰술", group: "양념·소스" },
-      { id: uid(), name: "설탕", amount: 1.5, unit: "큰술", group: "양념·소스" },
-    ],
-    steps: [
-      { id: uid(), title: "곱창 손질·데치기", content: "밀가루·굵은소금으로 주물러 씻고, 끓는 물에 생강 한 쪽 넣어 데친 뒤 찬물에 헹군다.", timerSeconds: 240 },
-      { id: uid(), title: "닭 데치기", content: "닭을 끓는 물에 데쳐 핏물·불순물을 제거하면 국물이 깔끔해진다.", timerSeconds: 180 },
-      { id: uid(), title: "당면 불리기", content: "미지근한 물에 당면을 담가 부드럽게 불린다.", timerSeconds: 1800 },
-      { id: uid(), title: "실비 양념 만들기", content: "간장·고춧가루·다진마늘·설탕을 섞어 매콤달콤한 양념장을 만든다.", timerSeconds: null },
-      { id: uid(), title: "끓이기", content: "닭·감자·양념·물 600ml를 붓고 센 불에 끓이다 중불로 졸인다.", timerSeconds: 900 },
-      { id: uid(), title: "곱창·채소 넣기", content: "곱창·양파·청양고추를 넣고 더 끓여 양념이 배게 한다.", timerSeconds: 600 },
-      { id: uid(), title: "당면·마무리", content: "불린 당면과 대파를 넣고 졸인 뒤 통깨·참기름으로 마무리.", timerSeconds: 300 },
-    ],
-  },
-  {
-    id: uid(), category: "중식", title: "마파두부",
-    description: "두반장과 화자오의 얼얼한 맛, 부드러운 두부의 클래식 쓰촨 요리.",
-    baseServings: 2, totalMinutes: 25, difficulty: "쉬움", tags: ["매운맛", "밥도둑", "간단"],
-    createdBy: DEFAULT_USER_ID, updatedBy: DEFAULT_USER_ID,
-    favorites: [], inCartBy: [], notes: {}, cookLogs: [],
-    ingredients: [
-      { id: uid(), name: "두부", amount: 1, unit: "모", group: "기타" },
-      { id: uid(), name: "다진 돼지고기", amount: 150, unit: "g", group: "육류·해산물" },
-      { id: uid(), name: "대파", amount: 1, unit: "대", group: "채소" },
-      { id: uid(), name: "두반장", amount: 1.5, unit: "큰술", group: "양념·소스" },
-      { id: uid(), name: "굴소스", amount: 1, unit: "큰술", group: "양념·소스" },
-      { id: uid(), name: "전분물", amount: 2, unit: "큰술", group: "양념·소스" },
-    ],
-    steps: [
-      { id: uid(), title: "두부 데치기", content: "깍둑썬 두부를 소금물에 살짝 데쳐 단단하게 한다.", timerSeconds: 120 },
-      { id: uid(), title: "고기 볶기", content: "기름에 다진고기와 두반장을 볶아 고소한 향을 낸다.", timerSeconds: null },
-      { id: uid(), title: "조리기", content: "물과 굴소스를 넣고 두부를 넣어 끓인 뒤 전분물로 농도를 잡는다.", timerSeconds: 300 },
-    ],
-  },
-  {
-    id: uid(), category: "양식", title: "관자 베이컨 까르보나라",
-    description: "달걀노른자와 페코리노로 만든 정통 크림 없는 까르보나라.",
-    baseServings: 2, totalMinutes: 20, difficulty: "보통", tags: ["파스타", "면"],
-    createdBy: DEFAULT_USER_ID, updatedBy: DEFAULT_USER_ID,
-    favorites: [], inCartBy: [], notes: {},
-    cookLogs: [{ userId: DEFAULT_USER_ID, count: 1, lastCookedAt: Date.now() - 86400000 * 12 }],
-    ingredients: [
-      { id: uid(), name: "스파게티", amount: 200, unit: "g", group: "기타" },
-      { id: uid(), name: "베이컨(관찰레)", amount: 80, unit: "g", group: "육류·해산물" },
-      { id: uid(), name: "달걀노른자", amount: 3, unit: "개", group: "기타" },
-      { id: uid(), name: "페코리노 치즈", amount: 50, unit: "g", group: "기타" },
-      { id: uid(), name: "통후추", amount: 1, unit: "작은술", group: "양념·소스" },
-    ],
-    steps: [
-      { id: uid(), title: "면 삶기", content: "소금 넣은 물에 스파게티를 알덴테로 삶는다. 면수를 남겨둔다.", timerSeconds: 480 },
-      { id: uid(), title: "베이컨 굽기", content: "팬에 베이컨을 바삭하게 구워 기름을 낸다.", timerSeconds: null },
-      { id: uid(), title: "유화·마무리", content: "불을 끄고 노른자·치즈·면수를 섞어 크림처럼 유화시킨다.", timerSeconds: null },
-    ],
-  },
-  {
-    id: uid(), category: "일식", title: "연어 사케동",
-    description: "간장에 절인 연어를 따뜻한 밥에 올린 간단한 덮밥.",
-    baseServings: 1, totalMinutes: 15, difficulty: "쉬움", tags: ["덮밥", "간단", "회"],
-    createdBy: DEFAULT_USER_ID, updatedBy: DEFAULT_USER_ID,
-    favorites: [], inCartBy: [], notes: {}, cookLogs: [],
-    ingredients: [
-      { id: uid(), name: "생연어(횟감)", amount: 150, unit: "g", group: "육류·해산물" },
-      { id: uid(), name: "따뜻한 밥", amount: 1, unit: "공기", group: "기타" },
-      { id: uid(), name: "간장", amount: 2, unit: "큰술", group: "양념·소스" },
-      { id: uid(), name: "미림", amount: 1, unit: "큰술", group: "양념·소스" },
-      { id: uid(), name: "쪽파", amount: 2, unit: "대", group: "채소" },
-    ],
-    steps: [
-      { id: uid(), title: "절임장 재우기", content: "간장·미림에 슬라이스한 연어를 넣어 냉장고에서 재운다.", timerSeconds: 600 },
-      { id: uid(), title: "담기", content: "밥 위에 연어를 올리고 쪽파·깨·와사비를 곁들인다.", timerSeconds: null },
-    ],
-  },
-];
-
-/* ------------------------------------------------------------------ */
 /*  TOASTER                                                            */
 /* ------------------------------------------------------------------ */
 function Toaster() {
   const [items, setItems] = useState([]);
   useEffect(() => {
-    const fn = (msg) => {
+    const fn = (msg, opts = {}) => {
       const id = uid();
-      setItems((s) => [...s, { id, msg }]);
-      setTimeout(() => setItems((s) => s.filter((x) => x.id !== id)), 2200);
+      setItems((s) => [...s, { id, msg, actionLabel: opts.actionLabel, action: opts.action }]);
+      setTimeout(() => setItems((s) => s.filter((x) => x.id !== id)), opts.duration || 2200);
     };
     toastListeners.add(fn);
     return () => toastListeners.delete(fn);
@@ -572,7 +491,15 @@ function Toaster() {
   return (
     <div className="rb-toaster">
       {items.map((t) => (
-        <div key={t.id} className="rb-toast"><Check size={15} /> {t.msg}</div>
+        <div key={t.id} className="rb-toast" style={t.actionLabel ? { pointerEvents: "auto" } : {}}>
+          <Check size={15} /> {t.msg}
+          {t.actionLabel && (
+            <button className="rb-toast-act"
+              onClick={() => { setItems((s) => s.filter((x) => x.id !== t.id)); t.action?.(); }}>
+              {t.actionLabel}
+            </button>
+          )}
+        </div>
       ))}
     </div>
   );
@@ -619,7 +546,7 @@ function LoginSheet({ onClose, onSignIn }) {
       <div className="rb-sheet" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
         <div className="rb-sh-head">
           <b style={{ fontSize: 17 }}>로그인</b>
-          <div className="rb-ico" onClick={onClose}><X size={17} /></div>
+          <button className="rb-ico" aria-label="닫기" onClick={onClose}><X size={17} /></button>
         </div>
         <div className="rb-sh-body" style={{ textAlign: "center" }}>
           <p style={{ color: "var(--soft)", fontSize: 14, lineHeight: 1.6, marginTop: 4, marginBottom: 20 }}>
@@ -656,7 +583,7 @@ function AccountMenu({ user, email, onSignOut, onClose, onSaveProfile, initialEd
       <div className="rb-sheet" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
         <div className="rb-sh-head">
           <b style={{ fontSize: 17 }}>{firstSetup ? "프로필 설정" : editing ? "프로필 수정" : "내 계정"}</b>
-          {!firstSetup && <div className="rb-ico" onClick={onClose}><X size={17} /></div>}
+          {!firstSetup && <button className="rb-ico" aria-label="닫기" onClick={onClose}><X size={17} /></button>}
         </div>
         <div className="rb-sh-body">
           {editing ? (
@@ -729,7 +656,7 @@ export default function RecipeBox() {
   const [cat, setCat] = useState("all");
   const [q, setQ] = useState("");
   const [favOnly, setFavOnly] = useState(false);
-  const [sort, setSort] = useState("default");
+  const [sort, setSort] = useState("created"); // 기본: 최근 추가순 (DB 반환 순서는 사실상 무작위였음)
   const [detailId, setDetailId] = useState(null);
   const [cookId, setCookId] = useState(null);
   const [showAdd, setShowAdd] = useState(false);
@@ -761,6 +688,19 @@ export default function RecipeBox() {
     return () => window.removeEventListener("hashchange", apply);
   }, []);
   const navigate = (hash) => { deepLinkRef.current = false; window.location.hash = hash; };
+
+  /* ESC로 최상단 화면 닫기 (첫 프로필 설정은 제외) */
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key !== "Escape") return;
+      if (showAdd) setShowAdd(false);
+      else if (showLogin) setShowLogin(false);
+      else if (showAccountMenu) setShowAccountMenu(false);
+      else if (cookId || detailId) closeTop();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
   const closeTop = () => {
     if (/^#\//.test(window.location.hash)) {
       if (deepLinkRef.current) {
@@ -773,53 +713,38 @@ export default function RecipeBox() {
     } else { setDetailId(null); setCookId(null); }
   };
 
-  /* load from Supabase (migrate from localStorage if DB is empty) */
+  /* load from Supabase — 실패(오프라인 등) 시 마지막으로 본 데이터를 localStorage 캐시에서 복원 */
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      /* users·recipes 동시 조회 (순차 2회 왕복 → 1회 대기) */
-      const [
-        { data: dbUsers, error: usersErr },
-        { data: dbRecipes, error: recipesErr },
-      ] = await Promise.all([
-        supabase.from("app_users").select("*"),
-        supabase.from("recipes").select("*"),
-      ]);
-      if (cancelled) return;
-
-      /* ── users ── */
-      if (usersErr) { setDbError(usersErr.message); setLoaded(true); return; }
-      let resolvedUsers;
-      if (!dbUsers || !dbUsers.length) {
-        const localUsers = (() => { try { const v = localStorage.getItem("recipebox:v1:users"); return v ? JSON.parse(v) : null; } catch { return null; } })();
-        resolvedUsers = (localUsers && localUsers.length) ? localUsers : [DEFAULT_USER];
-        const { error: insErr } = await supabase.from("app_users").upsert(resolvedUsers, { onConflict: "id", ignoreDuplicates: true });
+      try {
+        const [
+          { data: dbUsers, error: usersErr },
+          { data: dbRecipes, error: recipesErr },
+        ] = await Promise.all([
+          supabase.from("app_users").select("*"),
+          supabase.from("recipes").select("*"),
+        ]);
         if (cancelled) return;
-        if (insErr) { setDbError(insErr.message); setLoaded(true); return; }
-      } else {
-        resolvedUsers = dbUsers;
-      }
-
-      /* ── recipes ── */
-      if (recipesErr) { setDbError(recipesErr.message); setLoaded(true); return; }
-      let rawRecipes;
-      if (!dbRecipes || !dbRecipes.length) {
-        const localData = (() => { try { const v = localStorage.getItem("recipebox:v1:recipes"); return v ? JSON.parse(v) : null; } catch { return null; } })();
-        if (localData && localData.length) {
-          rawRecipes = migrateRecipes(localData, DEFAULT_USER_ID);
+        if (usersErr || recipesErr) throw new Error((usersErr || recipesErr).message);
+        const users2 = dbUsers || [];
+        const recipes2 = (dbRecipes || []).map(fromRow);
+        saveJSON(STORE_CACHE_KEY, { users: users2, recipes: recipes2 });
+        setUsers(users2);
+        setRecipes(recipes2);
+      } catch (e) {
+        if (cancelled) return;
+        const cached = loadJSON(STORE_CACHE_KEY, null);
+        if (cached && cached.recipes?.length) {
+          setUsers(cached.users || []);
+          setRecipes(cached.recipes);
+          toast("오프라인 — 마지막 데이터를 보여드려요");
         } else {
-          rawRecipes = seed();
+          setDbError(String(e?.message || e));
         }
-        const { error: seedErr } = await supabase.from("recipes").upsert(rawRecipes.map(toRow), { onConflict: "id", ignoreDuplicates: true });
-        if (cancelled) return;
-        if (seedErr) { setDbError(seedErr.message); setLoaded(true); return; }
-      } else {
-        rawRecipes = dbRecipes.map(fromRow);
+      } finally {
+        if (!cancelled) setLoaded(true);
       }
-
-      setUsers(resolvedUsers);
-      setRecipes(rawRecipes);
-      setLoaded(true);
     })();
     return () => { cancelled = true; };
   }, []);
@@ -972,7 +897,21 @@ export default function RecipeBox() {
       toast("삭제에 실패했어요");
       return;
     }
-    toast("레시피를 삭제했어요");
+    toast("레시피를 삭제했어요", {
+      actionLabel: "실행취소", duration: 6000,
+      action: async () => {
+        if (!removed) return;
+        setRecipes((r) => (r.some((x) => x.id === removed.id) ? r : [removed, ...r]));
+        const { error: e2 } = await supabase.from("recipes").insert(toRow(removed));
+        if (e2) {
+          console.error("레시피 복구 실패:", e2);
+          setRecipes((r) => r.filter((x) => x.id !== removed.id));
+          toast("복구에 실패했어요");
+        } else {
+          toast("레시피를 복구했어요");
+        }
+      },
+    });
   };
   const addRecipe = async (r) => {
     if (!requireLogin()) return;
@@ -1064,8 +1003,8 @@ export default function RecipeBox() {
       if (cat !== "all" && r.category !== cat) return false;
       if (favOnly && !r.favorites?.includes(currentUserId)) return false;
       if (q.trim()) {
-        const t = (r.title + r.description + (r.tags || []).join(" ") + r.ingredients.map((i) => i.name).join(" ")).toLowerCase();
-        if (!t.includes(q.toLowerCase())) return false;
+        const t = r.title + " " + r.description + " " + (r.tags || []).join(" ") + " " + r.ingredients.map((i) => i.name).join(" ");
+        if (!matchKo(t, q)) return false;
       }
       return true;
     });
@@ -1103,7 +1042,7 @@ export default function RecipeBox() {
                 <div style={{ fontSize: 36, marginBottom: 16 }}>⚠️</div>
                 <div style={{ fontWeight: 700, fontSize: 17, marginBottom: 10 }}>Supabase 연결 오류</div>
                 <div style={{ color: "#8B95A1", fontSize: 13.5, lineHeight: 1.7, marginBottom: 20 }}>{dbError}</div>
-                <div style={{ background: "#F2F4F6", borderRadius: 12, padding: "14px 18px", textAlign: "left", fontSize: 13, lineHeight: 1.8 }}>
+                <div style={{ background: "var(--muted)", borderRadius: 12, padding: "14px 18px", textAlign: "left", fontSize: 13, lineHeight: 1.8 }}>
                   Supabase 대시보드에서 <b>recipes</b>·<b>app_users</b> 테이블의 RLS 정책을 확인하세요.<br />
                   필요한 정책: 읽기는 <code style={{ fontSize: 12, color: "#3182F6" }}>anon</code> 허용,
                   쓰기는 <code style={{ fontSize: 12, color: "#3182F6" }}>authenticated</code> 허용
@@ -1162,12 +1101,11 @@ export default function RecipeBox() {
               <button className="rb-ico" title={favOnly ? "전체 보기" : "즐겨찾기만 보기"}
                 onClick={() => setFavOnly((v) => !v)}
                 style={{ flex: "none", width: 42, height: 42,
-                  ...(favOnly ? { borderColor: "var(--gold)", color: "var(--gold)", background: "#FFFBE6" } : {}) }}>
+                  ...(favOnly ? { borderColor: "var(--gold)", color: "var(--gold)", background: "var(--gold-bg)" } : {}) }}>
                 <Star size={17} fill={favOnly ? "#F8C83A" : "none"} />
               </button>
               <select className="rb-sel" value={sort} onChange={(e) => setSort(e.target.value)}
                 style={{ width: 116, flex: "none" }}>
-                <option value="default">기본순</option>
                 <option value="created">최근 추가순</option>
                 <option value="recent">최근 조리순</option>
                 <option value="name">이름순</option>
@@ -1223,11 +1161,12 @@ export default function RecipeBox() {
                             </span>
                             <div className="rb-ctitle">{r.title}</div>
                           </div>
-                          <div
+                          <button
                             className={`rb-ico ${isFav ? "on" : ""}`}
+                            aria-label={isFav ? "즐겨찾기 해제" : "즐겨찾기"}
                             onClick={(e) => { e.stopPropagation(); toggleFav(r); }}>
                             <Star size={16} fill={isFav ? "#F8C83A" : "none"} />
-                          </div>
+                          </button>
                         </div>
                         <div className="rb-cdesc">{r.description}</div>
                         {r.sourceUrl && (
@@ -1271,12 +1210,12 @@ export default function RecipeBox() {
                             </div>
                           )}
                         </div>
-                        <div
+                        <button
                           className={`rb-ico ${inCart ? "cart" : ""}`}
-                          title="장보기 목록에 담기"
+                          title="장보기 목록에 담기" aria-label="장보기 담기"
                           onClick={() => toggleCart(r)}>
                           <ShoppingCart size={16} />
-                        </div>
+                        </button>
                       </div>
                     </article>
                   );
@@ -1398,7 +1337,7 @@ function Detail({ r, timers, startTimer, pauseTimer, resetTimer, onClose, update
         <div className="rb-sheet" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 640 }}>
           <div className="rb-sh-head">
             <b style={{ fontSize: 17 }}>레시피 편집</b>
-            <div className="rb-ico" onClick={() => setEditing(false)}><X size={17} /></div>
+            <button className="rb-ico" aria-label="편집 닫기" onClick={() => setEditing(false)}><X size={17} /></button>
           </div>
           <div className="rb-sh-body">
             <ManualForm
@@ -1425,13 +1364,14 @@ function Detail({ r, timers, startTimer, pauseTimer, resetTimer, onClose, update
               textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.title}</b>
           </div>
           <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-            <div className="rb-ico" title="편집" onClick={() => { if (requireLogin()) setEditing(true); }}><Pencil size={15} /></div>
-            <div
+            <button className="rb-ico" title="편집" aria-label="레시피 편집" onClick={() => { if (requireLogin()) setEditing(true); }}><Pencil size={15} /></button>
+            <button
               className={`rb-ico ${isFav ? "on" : ""}`}
+              aria-label={isFav ? "즐겨찾기 해제" : "즐겨찾기"}
               onClick={() => toggleFav(r)}>
               <Star size={16} fill={isFav ? "#F8C83A" : "none"} />
-            </div>
-            <div className="rb-ico" onClick={onClose}><X size={17} /></div>
+            </button>
+            <button className="rb-ico" aria-label="닫기" onClick={onClose}><X size={17} /></button>
           </div>
         </div>
 
@@ -1524,6 +1464,9 @@ function Detail({ r, timers, startTimer, pauseTimer, resetTimer, onClose, update
             );
           })}
 
+          {/* notes */}
+          <NoteSection r={r} users={users} currentUserId={currentUserId} update={update} requireLogin={requireLogin} />
+
           {/* comments */}
           <CommentSection r={r} users={users} currentUserId={currentUserId} update={update} requireLogin={requireLogin} />
 
@@ -1536,6 +1479,58 @@ function Detail({ r, timers, startTimer, pauseTimer, resetTimer, onClose, update
         </div>
       </div>
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  NOTE SECTION — 나만의 메모(간 조절·다음번 팁) + 가족 메모 보기       */
+/* ------------------------------------------------------------------ */
+function NoteSection({ r, users, currentUserId, update, requireLogin }) {
+  const myNote = (r.notes || {})[currentUserId] || "";
+  const [text, setText] = useState(myNote);
+  const dirty = text.trim() !== myNote.trim();
+
+  const save = () => {
+    if (!requireLogin()) return;
+    update(r.id, { notes: { ...(r.notes || {}), [currentUserId]: text.trim() }, updatedBy: currentUserId });
+    toast("메모를 저장했어요");
+  };
+
+  const others = Object.entries(r.notes || {})
+    .filter(([uid2, v]) => uid2 !== currentUserId && v && v.trim())
+    .map(([uid2, v]) => ({ user: users.find((u) => u.id === uid2), text: v }));
+
+  if (!currentUserId && others.length === 0) return null;
+
+  return (
+    <>
+      <div className="rb-sec-h"><Pencil size={15} /> 메모</div>
+      {currentUserId && (
+        <div className="rb-note">
+          <textarea className="rb-ta" value={text} onChange={(e) => setText(e.target.value)}
+            placeholder="나만 보는 건 아니지만, 나를 위한 메모 — 간 조절·다음번 팁 등"
+            style={{ minHeight: 60, background: "var(--card)" }} />
+          {dirty && (
+            <button className="rb-btn acc" style={{ marginTop: 8 }} onClick={save}>
+              <Check size={14} /> 메모 저장
+            </button>
+          )}
+        </div>
+      )}
+      {others.length > 0 && (
+        <div className="rb-other-notes">
+          {others.map((o, idx) => (
+            <div key={idx} className="rb-other-note-item">
+              <UserAvatar user={o.user || { emoji: "🧑" }} size={24} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 11.5, fontWeight: 700, marginBottom: 2 }}>{o.user?.name || "가족"}</div>
+                <div style={{ fontSize: 13, lineHeight: 1.55, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{o.text}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </>
   );
 }
 
@@ -1647,7 +1642,7 @@ function CookMode({ r, timers, startTimer, pauseTimer, resetTimer, onClose, onFi
           </div>
           <b style={{ fontSize: 16 }}>{r.title}</b>
         </div>
-        <div className="rb-ico" onClick={onClose}><X size={18} /></div>
+        <button className="rb-ico" aria-label="요리 모드 닫기" onClick={onClose}><X size={18} /></button>
       </div>
 
       <div className="rb-cook-b">
@@ -1787,9 +1782,9 @@ function ShoppingView({ cartRecipes, checked, setChecked, onRemove, onClear, onO
               <b style={{ fontSize: 14 }}>{getServings(r)}인분</b>
               <button onClick={() => bumpServings(r, 1)}><Plus size={14} /></button>
             </div>
-            <div className="rb-ico" style={{ width: 28, height: 28, flex: "none" }} title="빼기" onClick={() => onRemove(r.id)}>
+            <button className="rb-ico" style={{ width: 28, height: 28, flex: "none" }} title="빼기" aria-label="장보기에서 빼기" onClick={() => onRemove(r.id)}>
               <X size={14} />
-            </div>
+            </button>
           </div>
         ))}
       </div>
@@ -1816,7 +1811,7 @@ function ShoppingView({ cartRecipes, checked, setChecked, onRemove, onClear, onO
                 <span className="nm" style={{ flex: 1, fontSize: 14 }}>{x.name}</span>
                 <span style={{ fontWeight: 600, color: "var(--accent)" }}>{fmt(x.amount)}{x.unit}</span>
                 {x.from.length > 1 && (
-                  <span style={{ fontSize: 10.5, color: "var(--soft)", background: "#EBF2FF", padding: "2px 7px", borderRadius: 999 }}>
+                  <span style={{ fontSize: 10.5, color: "var(--soft)", background: "var(--accent-soft)", padding: "2px 7px", borderRadius: 999 }}>
                     {x.from.length}개 레시피
                   </span>
                 )}
@@ -1847,7 +1842,7 @@ function AddModal({ onClose, onAdd, currentUserId }) {
               <Pencil size={14} /> 직접 입력
             </button>
           </div>
-          <div className="rb-ico" onClick={onClose}><X size={17} /></div>
+          <button className="rb-ico" aria-label="닫기" onClick={onClose}><X size={17} /></button>
         </div>
         <div className="rb-sh-body">
           {mode === "ai"
@@ -2186,7 +2181,7 @@ function ManualForm({ onSubmit, currentUserId, initial, submitLabel = "레시피
             onChange={(e) => setIngs((p) => p.map((x) => x.id === it.id ? { ...x, group: e.target.value } : x))}>
             {GROUPS.map((g) => <option key={g}>{g}</option>)}
           </select>
-          <div className="rb-ico" onClick={() => setIngs((p) => p.filter((x) => x.id !== it.id))}><X size={14} /></div>
+          <button className="rb-ico" aria-label="재료 삭제" onClick={() => setIngs((p) => p.filter((x) => x.id !== it.id))}><X size={14} /></button>
         </div>
       ))}
       <button className="rb-btn" style={{ marginBottom: 16 }}
@@ -2202,7 +2197,7 @@ function ManualForm({ onSubmit, currentUserId, initial, submitLabel = "레시피
               onChange={(e) => setSteps((p) => p.map((x) => x.id === st.id ? { ...x, title: e.target.value } : x))} />
             <input className="rb-in" style={{ width: 90 }} placeholder="타이머(분)" value={st.min}
               onChange={(e) => setSteps((p) => p.map((x) => x.id === st.id ? { ...x, min: e.target.value } : x))} />
-            <div className="rb-ico" onClick={() => setSteps((p) => p.filter((x) => x.id !== st.id))}><X size={14} /></div>
+            <button className="rb-ico" aria-label="단계 삭제" onClick={() => setSteps((p) => p.filter((x) => x.id !== st.id))}><X size={14} /></button>
           </div>
           <input className="rb-in" placeholder="설명" value={st.content}
             onChange={(e) => setSteps((p) => p.map((x) => x.id === st.id ? { ...x, content: e.target.value } : x))} />
