@@ -67,15 +67,15 @@
 
 ## 3. 작업계획 (제안 순서)
 
-### Phase 1 — 보안·데이터 보호 (반나절)
-1. A1: 워크플로 시크릿 주입 제거 + 죽은 상수 삭제 (+ 키 노출 여부 점검)
-2. A2: RLS 정책 적용(읽기 public / 쓰기 authenticated) + 오류 화면 문구 수정
-3. A3: Edge Function 로그인 사용자 제한
-4. C2: 장보기 체크·인분 localStorage 보존 *(작지만 실사용 임팩트 커서 선행)*
+### Phase 1 — 보안·데이터 보호 ✅ 완료 (2026-06-10)
+1. ✅ A1: 워크플로 시크릿 주입 제거 + 죽은 상수 삭제
+2. ✅ A2: RLS 정책 적용 완료(읽기 anon / 쓰기 authenticated, `supabase/migrations/20260610000000_enable_rls.sql`) — **라이브 DB에 적용·검증됨**
+3. ✅ A3: Edge Function 로그인 사용자 제한 — 코드 완료, **master 배포 후 함수 재배포 필요** (순서 중요: 웹 먼저)
+4. ✅ C2: 장보기 체크·인분 localStorage 보존
 
-### Phase 2 — 체감 성능 (반나절)
-5. B1: supabase-js 번들링(Vite alias)
-6. B2: 폰트 preload 전환 / B3: 초기 쿼리 병렬화 / B4: 애니메이션 정리
+### Phase 2 — 체감 성능 ✅ 완료 (2026-06-10)
+5. ✅ B1: supabase-js 번들링(bare import 전환)
+6. ✅ B2: 폰트 dynamic-subset preload / ✅ B3: 초기 쿼리 병렬화 / ✅ B4: 검색 중 애니메이션 지연 제거
 
 ### Phase 3 — 핵심 UX (1~2일)
 7. C1: 타이머 timestamp화 + Wake Lock + 종료 알림

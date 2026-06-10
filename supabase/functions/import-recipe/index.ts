@@ -7,6 +7,10 @@
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY") ?? "";
 const GEMINI_MODEL = "gemini-2.5-flash";
 
+// Supabase가 Edge Function 런타임에 자동 주입하는 값들 (별도 시크릿 설정 불필요)
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
+const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -18,6 +22,22 @@ function json(body: unknown, status = 200) {
     status,
     headers: { ...CORS, "Content-Type": "application/json" },
   });
+}
+
+/* ---------------- Auth ----------------
+   로그인한 사용자의 액세스 토큰만 허용한다.
+   anon 키만으로 호출하면 거부 → 외부인이 Gemini 쿼터를 소모하는 것을 차단. */
+async function isLoggedInUser(req: Request): Promise<boolean> {
+  const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
+  if (!token || token === SUPABASE_ANON_KEY) return false;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${token}` },
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
 
 /* ---------------- YouTube helpers ---------------- */
@@ -120,6 +140,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json({ error: "POST only" }, 405);
   if (!GEMINI_API_KEY) return json({ error: "GEMINI_API_KEY 미설정" }, 500);
+  if (!(await isLoggedInUser(req))) return json({ error: "로그인이 필요해요" }, 401);
 
   let input = "";
   try {

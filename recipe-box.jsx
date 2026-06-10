@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "@supabase/supabase-js";
 import {
   Search, Plus, Clock, Check, ShoppingCart, Star, Trash2, X, Play, Pause,
   RotateCcw, ChefHat, Sparkles, Minus, Loader2, Flame, ChevronRight,
@@ -10,9 +10,8 @@ import {
 /* ------------------------------------------------------------------ */
 /*  THEME / STYLE                                                      */
 /* ------------------------------------------------------------------ */
+/* Pretendard 폰트는 web/index.html에서 <link>로 선로딩한다(여기 @import면 JS 실행 후에야 받기 시작). */
 const CSS = `
-@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
-
 .rb * { box-sizing: border-box; }
 .rb {
   --bg: #F9FAFB;
@@ -289,6 +288,8 @@ const CATS = ["한식", "중식", "양식", "일식", "기타"];
 const CAT_COLOR = { 한식: "#BE4329", 중식: "#C98A2B", 양식: "#6F7A52", 일식: "#4A6C7A", 기타: "#8A6D8B" };
 const GROUPS = ["채소", "육류·해산물", "양념·소스", "기타"];
 const STORE_CURUSER_KEY = "recipebox:v1:currentUser";
+const STORE_SHOP_CHECKED_KEY = "recipebox:v1:shopChecked";
+const STORE_SHOP_SERVINGS_KEY = "recipebox:v1:shopServings";
 
 const DEFAULT_USER_ID = "user_chaeyuna";
 const DEFAULT_USER = { id: DEFAULT_USER_ID, name: "채유나", emoji: "🧑‍🍳", color: "#3182F6" };
@@ -304,6 +305,9 @@ const localStore = {
   loadCurrentUser: () => { try { return localStorage.getItem(STORE_CURUSER_KEY); } catch (e) { return null; } },
   saveCurrentUser: (id) => { try { localStorage.setItem(STORE_CURUSER_KEY, id); } catch (e) {} },
 };
+/* 장보기 체크·인분 등 JSON 상태 보존 — 마트에서 새로고침해도 유지 */
+const loadJSON = (key, fallback) => { try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch (e) { return fallback; } };
+const saveJSON = (key, val) => { try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {} };
 
 /* DB row ↔ JS object 변환 */
 const toRow = (r) => ({
@@ -716,7 +720,8 @@ export default function RecipeBox() {
   const [showAccountMenu, setShowAccountMenu] = useState(false);
   const [needsProfileSetup, setNeedsProfileSetup] = useState(false);
   const [timers, setTimers] = useState({});
-  const [checked, setChecked] = useState({});
+  const [checked, setChecked] = useState(() => loadJSON(STORE_SHOP_CHECKED_KEY, {}));
+  useEffect(() => { saveJSON(STORE_SHOP_CHECKED_KEY, checked); }, [checked]);
 
   const [dbError, setDbError] = useState(null);
 
@@ -727,9 +732,17 @@ export default function RecipeBox() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      /* ── users ── */
-      const { data: dbUsers, error: usersErr } = await supabase.from("app_users").select("*");
+      /* users·recipes 동시 조회 (순차 2회 왕복 → 1회 대기) */
+      const [
+        { data: dbUsers, error: usersErr },
+        { data: dbRecipes, error: recipesErr },
+      ] = await Promise.all([
+        supabase.from("app_users").select("*"),
+        supabase.from("recipes").select("*"),
+      ]);
       if (cancelled) return;
+
+      /* ── users ── */
       if (usersErr) { setDbError(usersErr.message); setLoaded(true); return; }
       let resolvedUsers;
       if (!dbUsers || !dbUsers.length) {
@@ -743,8 +756,6 @@ export default function RecipeBox() {
       }
 
       /* ── recipes ── */
-      const { data: dbRecipes, error: recipesErr } = await supabase.from("recipes").select("*");
-      if (cancelled) return;
       if (recipesErr) { setDbError(recipesErr.message); setLoaded(true); return; }
       let rawRecipes;
       if (!dbRecipes || !dbRecipes.length) {
@@ -1033,11 +1044,10 @@ export default function RecipeBox() {
                 <div style={{ fontWeight: 700, fontSize: 17, marginBottom: 10 }}>Supabase 연결 오류</div>
                 <div style={{ color: "#8B95A1", fontSize: 13.5, lineHeight: 1.7, marginBottom: 20 }}>{dbError}</div>
                 <div style={{ background: "#F2F4F6", borderRadius: 12, padding: "14px 18px", textAlign: "left", fontSize: 13, lineHeight: 1.8 }}>
-                  Supabase SQL Editor에서 아래를 실행하세요:<br />
-                  <code style={{ fontSize: 12, color: "#3182F6" }}>
-                    alter table recipes disable row level security;<br />
-                    alter table app_users disable row level security;
-                  </code>
+                  Supabase 대시보드에서 <b>recipes</b>·<b>app_users</b> 테이블의 RLS 정책을 확인하세요.<br />
+                  필요한 정책: 읽기는 <code style={{ fontSize: 12, color: "#3182F6" }}>anon</code> 허용,
+                  쓰기는 <code style={{ fontSize: 12, color: "#3182F6" }}>authenticated</code> 허용
+                  (<code style={{ fontSize: 12 }}>supabase/migrations</code>의 RLS 마이그레이션 참고).
                 </div>
               </div>
             )
@@ -1134,7 +1144,8 @@ export default function RecipeBox() {
                   const myLog = r.cookLogs?.find((l) => l.userId === currentUserId);
                   const creator = users.find((u) => u.id === r.createdBy);
                   return (
-                    <article key={r.id} className="rb-card" style={{ animationDelay: `${i * 0.04}s` }}
+                    <article key={r.id} className="rb-card"
+                      style={{ animationDelay: q ? "0s" : `${Math.min(i * 0.04, 0.5)}s` }}
                       onClick={() => setDetailId(r.id)}>
                       <div className="rb-cbody">
                         <div className="rb-ctop">
@@ -1220,6 +1231,7 @@ export default function RecipeBox() {
             onClear={() => {
               cartRecipes.forEach((r) =>
                 update(r.id, { inCartBy: (r.inCartBy || []).filter((uid) => uid !== currentUserId) }));
+              setChecked({});
               toast("장보기 목록을 비웠어요");
             }}
             onOpen={(id) => setDetailId(id)}
@@ -1633,8 +1645,9 @@ function CookMode({ r, timers, startTimer, pauseTimer, resetTimer, onClose, onFi
 /*  SHOPPING VIEW                                                      */
 /* ------------------------------------------------------------------ */
 function ShoppingView({ cartRecipes, checked, setChecked, onRemove, onClear, onOpen }) {
-  // 요리별 인분 설정 (기본: 각 레시피 baseServings)
-  const [servingsMap, setServingsMap] = useState({});
+  // 요리별 인분 설정 (기본: 각 레시피 baseServings) — 새로고침·탭 이동에도 유지
+  const [servingsMap, setServingsMap] = useState(() => loadJSON(STORE_SHOP_SERVINGS_KEY, {}));
+  useEffect(() => { saveJSON(STORE_SHOP_SERVINGS_KEY, servingsMap); }, [servingsMap]);
   const getServings = (r) => servingsMap[r.id] ?? r.baseServings;
   const bumpServings = (r, delta) => setServingsMap((m) => {
     const cur = m[r.id] ?? r.baseServings;
@@ -1768,13 +1781,6 @@ function AddModal({ onClose, onAdd, currentUserId }) {
   );
 }
 
-/* Gemini API key — 빌드 시 주입 (Vite: VITE_GEMINI_API_KEY).
-   하드코딩하면 공개 번들에 노출되므로 환경변수로만 받는다. */
-const GEMINI_API_KEY =
-  (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.VITE_GEMINI_API_KEY) || "";
-/* googleSearch(Grounding) 도구는 Gemini 2.0+ 에서만 지원된다. 1.5-flash는 불가. */
-const GEMINI_MODEL = "gemini-2.5-flash";
-
 function AIImport({ onAdd, currentUserId }) {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -1788,12 +1794,16 @@ function AIImport({ onAdd, currentUserId }) {
 
     try {
       // 자막 추출·AI 호출은 Supabase Edge Function(import-recipe)에서 서버사이드로 처리.
-      // 유튜브 링크면 자막(음성+자막)을 읽어 레시피화하고, 그 외엔 검색 그라운딩을 사용한다.
+      // 유튜브 링크면 영상을 분석해 레시피화하고, 그 외엔 검색 그라운딩을 사용한다.
+      // 서버가 로그인 사용자만 받도록 사용자 액세스 토큰을 보낸다(Gemini 무단 호출 차단).
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token || SUPABASE_ANON_KEY;
       const res = await fetch(`${SUPABASE_URL}/functions/v1/import-recipe`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({ input: input.trim() }),
       });
