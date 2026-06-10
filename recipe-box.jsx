@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "@supabase/supabase-js";
 import {
   Search, Plus, Clock, Check, ShoppingCart, Star, Trash2, X, Play, Pause,
   RotateCcw, ChefHat, Sparkles, Minus, Loader2, Flame, ChevronRight,
@@ -10,9 +10,8 @@ import {
 /* ------------------------------------------------------------------ */
 /*  THEME / STYLE                                                      */
 /* ------------------------------------------------------------------ */
+/* Pretendard 폰트는 web/index.html에서 <link>로 선로딩한다(여기 @import면 JS 실행 후에야 받기 시작). */
 const CSS = `
-@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
-
 .rb * { box-sizing: border-box; }
 .rb {
   --bg: #F9FAFB;
@@ -80,6 +79,8 @@ const CSS = `
   cursor:pointer; transition:.2s; display:flex; flex-direction:column;
   box-shadow:0 2px 12px rgba(0,0,0,.06); animation:rb-up .5s both; }
 .rb-card:hover { transform:translateY(-3px); box-shadow:0 12px 28px rgba(0,0,0,.12); }
+.rb-thumb { width:100%; aspect-ratio:16/9; background:#F2F4F6; overflow:hidden; flex:none; }
+.rb-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
 .rb-cbody { padding:16px 16px 12px; flex:1; display:flex; flex-direction:column; }
 .rb-ctop { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
 .rb-ctitle { font-size:18px; line-height:1.25; letter-spacing:-.3px; font-weight:700; }
@@ -289,6 +290,8 @@ const CATS = ["한식", "중식", "양식", "일식", "기타"];
 const CAT_COLOR = { 한식: "#BE4329", 중식: "#C98A2B", 양식: "#6F7A52", 일식: "#4A6C7A", 기타: "#8A6D8B" };
 const GROUPS = ["채소", "육류·해산물", "양념·소스", "기타"];
 const STORE_CURUSER_KEY = "recipebox:v1:currentUser";
+const STORE_SHOP_CHECKED_KEY = "recipebox:v1:shopChecked";
+const STORE_SHOP_SERVINGS_KEY = "recipebox:v1:shopServings";
 
 const DEFAULT_USER_ID = "user_chaeyuna";
 const DEFAULT_USER = { id: DEFAULT_USER_ID, name: "채유나", emoji: "🧑‍🍳", color: "#3182F6" };
@@ -304,6 +307,9 @@ const localStore = {
   loadCurrentUser: () => { try { return localStorage.getItem(STORE_CURUSER_KEY); } catch (e) { return null; } },
   saveCurrentUser: (id) => { try { localStorage.setItem(STORE_CURUSER_KEY, id); } catch (e) {} },
 };
+/* 장보기 체크·인분 등 JSON 상태 보존 — 마트에서 새로고침해도 유지 */
+const loadJSON = (key, fallback) => { try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch (e) { return fallback; } };
+const saveJSON = (key, val) => { try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {} };
 
 /* DB row ↔ JS object 변환 */
 const toRow = (r) => ({
@@ -394,6 +400,21 @@ const fmt = (n) => {
 const mmss = (s) => {
   const m = Math.floor(s / 60), x = s % 60;
   return `${String(m).padStart(2, "0")}:${String(x).padStart(2, "0")}`;
+};
+
+/* 유튜브 출처 레시피 → 썸네일 URL (별도 저장 없이 sourceUrl에서 파생) */
+const youtubeThumb = (url) => {
+  const m = String(url || "").match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?[^\s]*\bv=|shorts\/|embed\/|live\/))([A-Za-z0-9_-]{11})/);
+  return m ? `https://i.ytimg.com/vi/${m[1]}/hqdefault.jpg` : null;
+};
+
+/* 타이머 종료 알림 — 화면을 보고 있지 않을 때만 브라우저 알림(보는 중엔 비프음으로 충분) */
+const notifyTimerDone = (label) => {
+  try {
+    if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
+    if (document.visibilityState === "visible") return;
+    new Notification("⏰ 타이머 완료", { body: label ? `'${label}' 단계가 끝났어요.` : "조리 단계 타이머가 끝났어요." });
+  } catch (e) {}
 };
 
 let audioCtx = null;
@@ -716,20 +737,57 @@ export default function RecipeBox() {
   const [showAccountMenu, setShowAccountMenu] = useState(false);
   const [needsProfileSetup, setNeedsProfileSetup] = useState(false);
   const [timers, setTimers] = useState({});
-  const [checked, setChecked] = useState({});
+  const [checked, setChecked] = useState(() => loadJSON(STORE_SHOP_CHECKED_KEY, {}));
+  useEffect(() => { saveJSON(STORE_SHOP_CHECKED_KEY, checked); }, [checked]);
 
   const [dbError, setDbError] = useState(null);
 
   /* 로그인한 구글 사용자 = 현재 사용자 (비로그인 시 null → 읽기 전용) */
   const currentUserId = session?.user?.id || null;
 
+  /* ── 해시 라우팅: 상세(#/recipe/:id)·요리모드(#/cook/:id)를 URL과 동기화 ──
+     레시피를 링크로 공유할 수 있고, 모바일 뒤로가기가 앱 이탈 대신 화면을 닫는다. */
+  const deepLinkRef = useRef(false); // 딥링크 직접 진입이면 back이 사이트 밖으로 가므로 구분
+  useEffect(() => {
+    deepLinkRef.current = /^#\//.test(window.location.hash);
+    const apply = () => {
+      const m = window.location.hash.match(/^#\/(recipe|cook)\/(.+)$/);
+      if (m && m[1] === "recipe") { setDetailId(decodeURIComponent(m[2])); setCookId(null); }
+      else if (m && m[1] === "cook") { setCookId(decodeURIComponent(m[2])); setDetailId(null); }
+      else { setDetailId(null); setCookId(null); }
+    };
+    apply();
+    window.addEventListener("hashchange", apply);
+    return () => window.removeEventListener("hashchange", apply);
+  }, []);
+  const navigate = (hash) => { deepLinkRef.current = false; window.location.hash = hash; };
+  const closeTop = () => {
+    if (/^#\//.test(window.location.hash)) {
+      if (deepLinkRef.current) {
+        deepLinkRef.current = false;
+        window.history.replaceState(null, "", window.location.pathname + window.location.search);
+        setDetailId(null); setCookId(null);
+      } else {
+        window.history.back(); // hashchange 핸들러가 상태를 정리
+      }
+    } else { setDetailId(null); setCookId(null); }
+  };
+
   /* load from Supabase (migrate from localStorage if DB is empty) */
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      /* ── users ── */
-      const { data: dbUsers, error: usersErr } = await supabase.from("app_users").select("*");
+      /* users·recipes 동시 조회 (순차 2회 왕복 → 1회 대기) */
+      const [
+        { data: dbUsers, error: usersErr },
+        { data: dbRecipes, error: recipesErr },
+      ] = await Promise.all([
+        supabase.from("app_users").select("*"),
+        supabase.from("recipes").select("*"),
+      ]);
       if (cancelled) return;
+
+      /* ── users ── */
       if (usersErr) { setDbError(usersErr.message); setLoaded(true); return; }
       let resolvedUsers;
       if (!dbUsers || !dbUsers.length) {
@@ -743,8 +801,6 @@ export default function RecipeBox() {
       }
 
       /* ── recipes ── */
-      const { data: dbRecipes, error: recipesErr } = await supabase.from("recipes").select("*");
-      if (cancelled) return;
       if (recipesErr) { setDbError(recipesErr.message); setLoaded(true); return; }
       let rawRecipes;
       if (!dbRecipes || !dbRecipes.length) {
@@ -832,23 +888,30 @@ export default function RecipeBox() {
     return () => supabase.removeChannel(ch);
   }, []);
 
-  /* timer tick */
+  /* timer tick — endAt(절대시각) 기준으로 남은 시간을 계산.
+     setInterval 감산 방식은 백그라운드 탭/화면 꺼짐에서 스로틀돼 시간이 밀렸음. */
   const running = Object.values(timers).some((t) => t.running);
   useEffect(() => {
     if (!running) return;
-    const iv = setInterval(() => {
+    const tick = () => {
       setTimers((prev) => {
+        const now = Date.now();
         const next = { ...prev }; let ch = false;
         for (const k in next) {
-          if (next[k].running && next[k].remaining > 0) {
-            next[k] = { ...next[k], remaining: next[k].remaining - 1 }; ch = true;
-            if (next[k].remaining === 0) { next[k].running = false; beep(); }
+          const t = next[k];
+          if (!t.running) continue;
+          const rem = Math.max(0, Math.ceil((t.endAt - now) / 1000));
+          if (rem !== t.remaining) {
+            next[k] = { ...t, remaining: rem, running: rem > 0 }; ch = true;
+            if (rem === 0) { beep(); notifyTimerDone(t.label); }
           }
         }
         return ch ? next : prev;
       });
-    }, 1000);
-    return () => clearInterval(iv);
+    };
+    const iv = setInterval(tick, 500);
+    document.addEventListener("visibilitychange", tick); // 화면 복귀 시 즉시 보정
+    return () => { clearInterval(iv); document.removeEventListener("visibilitychange", tick); };
   }, [running]);
 
   /* auth */
@@ -901,7 +964,7 @@ export default function RecipeBox() {
     if (!requireLogin()) return;
     let removed;
     setRecipes((r) => { removed = r.find((x) => x.id === id); return r.filter((x) => x.id !== id); });
-    setDetailId(null);
+    closeTop();
     const { error } = await supabase.from("recipes").delete().eq("id", id);
     if (error) {
       console.error("레시피 삭제 실패:", error);
@@ -950,12 +1013,20 @@ export default function RecipeBox() {
     toast(inCart ? "장보기에서 뺐어요" : "장보기에 담았어요 🛒");
   };
 
-  const startTimer = (key, total) =>
-    setTimers((t) => ({ ...t, [key]: { remaining: t[key]?.remaining ?? total, total, running: true } }));
+  const startTimer = (key, total, label) => {
+    // 첫 타이머 시작(사용자 제스처) 시 알림 권한 요청 — 백그라운드 종료 알림용
+    try { if (typeof Notification !== "undefined" && Notification.permission === "default") Notification.requestPermission(); } catch (e) {}
+    setTimers((t) => {
+      const rem = t[key]?.remaining ?? total;
+      return { ...t, [key]: { remaining: rem, total, label, running: true, endAt: Date.now() + rem * 1000 } };
+    });
+  };
   const pauseTimer = (key) =>
-    setTimers((t) => (t[key] ? { ...t, [key]: { ...t[key], running: false } } : t));
+    setTimers((t) => t[key]?.running
+      ? { ...t, [key]: { ...t[key], running: false, remaining: Math.max(0, Math.ceil((t[key].endAt - Date.now()) / 1000)) } }
+      : t);
   const resetTimer = (key, total) =>
-    setTimers((t) => ({ ...t, [key]: { remaining: total, total, running: false } }));
+    setTimers((t) => ({ ...t, [key]: { ...t[key], remaining: total, total, running: false } }));
 
   const markCooked = (id, extra = {}) => {
     if (!requireLogin()) return;
@@ -1033,11 +1104,10 @@ export default function RecipeBox() {
                 <div style={{ fontWeight: 700, fontSize: 17, marginBottom: 10 }}>Supabase 연결 오류</div>
                 <div style={{ color: "#8B95A1", fontSize: 13.5, lineHeight: 1.7, marginBottom: 20 }}>{dbError}</div>
                 <div style={{ background: "#F2F4F6", borderRadius: 12, padding: "14px 18px", textAlign: "left", fontSize: 13, lineHeight: 1.8 }}>
-                  Supabase SQL Editor에서 아래를 실행하세요:<br />
-                  <code style={{ fontSize: 12, color: "#3182F6" }}>
-                    alter table recipes disable row level security;<br />
-                    alter table app_users disable row level security;
-                  </code>
+                  Supabase 대시보드에서 <b>recipes</b>·<b>app_users</b> 테이블의 RLS 정책을 확인하세요.<br />
+                  필요한 정책: 읽기는 <code style={{ fontSize: 12, color: "#3182F6" }}>anon</code> 허용,
+                  쓰기는 <code style={{ fontSize: 12, color: "#3182F6" }}>authenticated</code> 허용
+                  (<code style={{ fontSize: 12 }}>supabase/migrations</code>의 RLS 마이그레이션 참고).
                 </div>
               </div>
             )
@@ -1133,9 +1203,17 @@ export default function RecipeBox() {
                   const tried = r.cookLogs?.some((l) => l.userId === currentUserId && l.count > 0);
                   const myLog = r.cookLogs?.find((l) => l.userId === currentUserId);
                   const creator = users.find((u) => u.id === r.createdBy);
+                  const thumb = youtubeThumb(r.sourceUrl);
                   return (
-                    <article key={r.id} className="rb-card" style={{ animationDelay: `${i * 0.04}s` }}
-                      onClick={() => setDetailId(r.id)}>
+                    <article key={r.id} className="rb-card"
+                      style={{ animationDelay: q ? "0s" : `${Math.min(i * 0.04, 0.5)}s` }}
+                      onClick={() => navigate(`#/recipe/${r.id}`)}>
+                      {thumb && (
+                        <div className="rb-thumb">
+                          <img src={thumb} alt="" loading="lazy"
+                            onError={(e) => { e.currentTarget.parentElement.style.display = "none"; }} />
+                        </div>
+                      )}
                       <div className="rb-cbody">
                         <div className="rb-ctop">
                           <div style={{ flex: 1 }}>
@@ -1220,9 +1298,10 @@ export default function RecipeBox() {
             onClear={() => {
               cartRecipes.forEach((r) =>
                 update(r.id, { inCartBy: (r.inCartBy || []).filter((uid) => uid !== currentUserId) }));
+              setChecked({});
               toast("장보기 목록을 비웠어요");
             }}
-            onOpen={(id) => setDetailId(id)}
+            onOpen={(id) => navigate(`#/recipe/${id}`)}
           />
         )}
       </div>
@@ -1237,8 +1316,8 @@ export default function RecipeBox() {
         <Detail
           r={detail} timers={timers} users={users} currentUserId={currentUserId}
           startTimer={startTimer} pauseTimer={pauseTimer} resetTimer={resetTimer}
-          onClose={() => setDetailId(null)} update={update} remove={remove}
-          markCooked={markCooked} onCook={() => { setCookId(detail.id); setDetailId(null); }}
+          onClose={closeTop} update={update} remove={remove}
+          markCooked={markCooked} onCook={() => navigate(`#/cook/${detail.id}`)}
           toggleFav={toggleFav} toggleCart={toggleCart} requireLogin={requireLogin}
         />
       )}
@@ -1248,8 +1327,8 @@ export default function RecipeBox() {
         <CookMode
           r={cookRecipe} timers={timers}
           startTimer={startTimer} pauseTimer={pauseTimer} resetTimer={resetTimer}
-          onClose={() => setCookId(null)}
-          onFinish={(rating, memo) => { markCooked(cookRecipe.id, { rating, memo }); setCookId(null); }}
+          onClose={closeTop}
+          onFinish={(rating, memo) => { markCooked(cookRecipe.id, { rating, memo }); closeTop(); }}
         />
       )}
 
@@ -1436,7 +1515,7 @@ function Detail({ r, timers, startTimer, pauseTimer, resetTimer, onClose, update
                       <span className={`rb-tval ${warn ? "warn" : ""}`}>{mmss(remaining)}</span>
                       {t?.running
                         ? <button className="rb-tbtn" onClick={() => pauseTimer(key)}><Pause size={15} /></button>
-                        : <button className="rb-tbtn" onClick={() => startTimer(key, total)}><Play size={15} /></button>}
+                        : <button className="rb-tbtn" onClick={() => startTimer(key, total, s.title)}><Play size={15} /></button>}
                       <button className="rb-tbtn g" onClick={() => resetTimer(key, total)}><RotateCcw size={14} /></button>
                     </div>
                   )}
@@ -1540,6 +1619,16 @@ function CookMode({ r, timers, startTimer, pauseTimer, resetTimer, onClose, onFi
   const [finishing, setFinishing] = useState(false);
   const [rating, setRating] = useState(0);
   const [memo, setMemo] = useState("");
+
+  /* 요리 중 화면 꺼짐 방지 (Wake Lock — 미지원 브라우저는 조용히 무시) */
+  useEffect(() => {
+    let lock = null;
+    const acquire = () => navigator.wakeLock?.request("screen").then((l) => { lock = l; }).catch(() => {});
+    acquire();
+    const onVis = () => { if (document.visibilityState === "visible") acquire(); }; // 탭 복귀 시 재획득
+    document.addEventListener("visibilitychange", onVis);
+    return () => { document.removeEventListener("visibilitychange", onVis); lock?.release().catch(() => {}); };
+  }, []);
   const s = r.steps[i];
   const key = `${r.id}::${s.id}`;
   const t = timers[key];
@@ -1590,7 +1679,7 @@ function CookMode({ r, timers, startTimer, pauseTimer, resetTimer, onClose, onFi
                 <div className="rb-row" style={{ gap: 10, justifyContent: "center" }}>
                   {t?.running
                     ? <button className="rb-btn dark" onClick={() => pauseTimer(key)}><Pause size={16} /> 일시정지</button>
-                    : <button className="rb-btn acc" onClick={() => startTimer(key, total)}><Play size={16} /> 타이머 시작</button>}
+                    : <button className="rb-btn acc" onClick={() => startTimer(key, total, s.title)}><Play size={16} /> 타이머 시작</button>}
                   <button className="rb-btn" onClick={() => resetTimer(key, total)}><RotateCcw size={15} /> 리셋</button>
                 </div>
               </>
@@ -1633,8 +1722,9 @@ function CookMode({ r, timers, startTimer, pauseTimer, resetTimer, onClose, onFi
 /*  SHOPPING VIEW                                                      */
 /* ------------------------------------------------------------------ */
 function ShoppingView({ cartRecipes, checked, setChecked, onRemove, onClear, onOpen }) {
-  // 요리별 인분 설정 (기본: 각 레시피 baseServings)
-  const [servingsMap, setServingsMap] = useState({});
+  // 요리별 인분 설정 (기본: 각 레시피 baseServings) — 새로고침·탭 이동에도 유지
+  const [servingsMap, setServingsMap] = useState(() => loadJSON(STORE_SHOP_SERVINGS_KEY, {}));
+  useEffect(() => { saveJSON(STORE_SHOP_SERVINGS_KEY, servingsMap); }, [servingsMap]);
   const getServings = (r) => servingsMap[r.id] ?? r.baseServings;
   const bumpServings = (r, delta) => setServingsMap((m) => {
     const cur = m[r.id] ?? r.baseServings;
@@ -1744,6 +1834,7 @@ function ShoppingView({ cartRecipes, checked, setChecked, onRemove, onClear, onO
 /* ------------------------------------------------------------------ */
 function AddModal({ onClose, onAdd, currentUserId }) {
   const [mode, setMode] = useState("ai");
+  const [draft, setDraft] = useState(null); // AI 미리보기 → '수정해서 등록'으로 넘어온 초안
   return (
     <div className="rb-ov" onClick={onClose}>
       <div className="rb-sheet" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 640 }}>
@@ -1760,42 +1851,57 @@ function AddModal({ onClose, onAdd, currentUserId }) {
         </div>
         <div className="rb-sh-body">
           {mode === "ai"
-            ? <AIImport onAdd={onAdd} currentUserId={currentUserId} />
-            : <ManualForm onSubmit={onAdd} currentUserId={currentUserId} />}
+            ? <AIImport onAdd={onAdd} currentUserId={currentUserId}
+                onEdit={(r) => { setDraft(r); setMode("manual"); }} />
+            : <ManualForm onSubmit={onAdd} currentUserId={currentUserId} initial={draft} />}
         </div>
       </div>
     </div>
   );
 }
 
-/* Gemini API key — 빌드 시 주입 (Vite: VITE_GEMINI_API_KEY).
-   하드코딩하면 공개 번들에 노출되므로 환경변수로만 받는다. */
-const GEMINI_API_KEY =
-  (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.VITE_GEMINI_API_KEY) || "";
-/* googleSearch(Grounding) 도구는 Gemini 2.0+ 에서만 지원된다. 1.5-flash는 불가. */
-const GEMINI_MODEL = "gemini-2.5-flash";
-
-function AIImport({ onAdd, currentUserId }) {
+function AIImport({ onAdd, onEdit, currentUserId }) {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
   const [preview, setPreview] = useState(null);
+  const [elapsed, setElapsed] = useState(0);
+
+  /* 진행 경과 — 영상 분석은 30초+ 걸릴 수 있어 단계별 안내를 보여준다 */
+  useEffect(() => {
+    if (!busy) { setElapsed(0); return; }
+    const t0 = Date.now();
+    const iv = setInterval(() => setElapsed(Math.floor((Date.now() - t0) / 1000)), 1000);
+    return () => clearInterval(iv);
+  }, [busy]);
+  const isYoutube = /youtu\.be\/|youtube\.com\//.test(input);
+  const busyMsg =
+    elapsed < 5 ? "레시피를 가져오는 중…"
+    : elapsed < 25 ? (isYoutube ? "영상을 보고 재료·단계를 정리하는 중… (보통 20~40초)" : "검색하고 정리하는 중…")
+    : "거의 다 됐어요 — 조금만 기다려 주세요";
 
   const run = async () => {
     if (!input.trim()) return;
     setBusy(true); setErr("");
 
+    const ctrl = new AbortController();
+    const timeout = setTimeout(() => ctrl.abort(), 90000); // 90초 타임아웃
     try {
       // 자막 추출·AI 호출은 Supabase Edge Function(import-recipe)에서 서버사이드로 처리.
-      // 유튜브 링크면 자막(음성+자막)을 읽어 레시피화하고, 그 외엔 검색 그라운딩을 사용한다.
+      // 유튜브 링크면 영상을 분석해 레시피화하고, 그 외엔 검색 그라운딩을 사용한다.
+      // 서버가 로그인 사용자만 받도록 사용자 액세스 토큰을 보낸다(Gemini 무단 호출 차단).
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token || SUPABASE_ANON_KEY;
       const res = await fetch(`${SUPABASE_URL}/functions/v1/import-recipe`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({ input: input.trim() }),
+        signal: ctrl.signal,
       });
 
       const data = await res.json().catch(() => ({}));
@@ -1829,8 +1935,11 @@ function AIImport({ onAdd, currentUserId }) {
       setPreview(recipe);
     } catch (e) {
       console.error(e);
-      setErr("검색 또는 레시피 생성에 실패했어요. 입력 내용을 확인하거나 잠시 후 다시 시도해 주세요.");
+      setErr(e?.name === "AbortError"
+        ? "시간이 너무 오래 걸려 중단했어요. 잠시 후 다시 시도해 주세요."
+        : "검색 또는 레시피 생성에 실패했어요. 입력 내용을 확인하거나 잠시 후 다시 시도해 주세요.");
     } finally {
+      clearTimeout(timeout);
       setBusy(false);
     }
   };
@@ -1845,7 +1954,8 @@ function AIImport({ onAdd, currentUserId }) {
   if (preview) {
     return (
       <RecipePreview recipe={preview} saving={saving}
-        onConfirm={confirm} onRetry={() => { setPreview(null); setErr(""); }} />
+        onConfirm={confirm} onEdit={onEdit ? () => onEdit(preview) : null}
+        onRetry={() => { setPreview(null); setErr(""); }} />
     );
   }
 
@@ -1853,20 +1963,22 @@ function AIImport({ onAdd, currentUserId }) {
     <div>
       <p style={{ fontSize: 13.5, color: "var(--soft)", lineHeight: 1.6, marginBottom: 14 }}>
         요리 이름(예: <b>편스토랑 어남선생 닭볶음탕</b>), <b>유튜브 링크</b>, <b>URL</b>, 또는 레시피 <b>텍스트</b>를 넣으세요.
-        유튜브는 <b>영상 자막</b>을, 그 외엔 <b>웹 검색</b>을 통해 재료·단계·타이머까지 자동으로 정리해 줍니다.
+        유튜브는 <b>영상(화면+음성)을 직접 분석</b>하고, 그 외엔 <b>웹 검색</b>으로 재료·단계·타이머까지 자동으로 정리해 줍니다.
       </p>
       <textarea className="rb-ta" value={input} onChange={(e) => setInput(e.target.value)}
         placeholder={"예) 백종원 김치찌개\n또는 https://youtu.be/...\n또는 레시피 텍스트 붙여넣기"} style={{ minHeight: 130 }} />
       {err && <div style={{ color: "var(--danger)", fontSize: 12.5, marginTop: 8 }}>{err}</div>}
       <button className="rb-btn acc" style={{ marginTop: 14, width: "100%", justifyContent: "center", padding: 13 }}
         disabled={busy || !input.trim()} onClick={run}>
-        {busy ? <><Loader2 size={16} className="rb-spin" /> 검색 및 가져오는 중…</> : <><Sparkles size={16} /> AI로 검색 및 정리하기</>}
+        {busy
+          ? <><Loader2 size={16} className="rb-spin" /> {busyMsg} ({elapsed}초)</>
+          : <><Sparkles size={16} /> AI로 검색 및 정리하기</>}
       </button>
     </div>
   );
 }
 
-function RecipePreview({ recipe, saving, onConfirm, onRetry }) {
+function RecipePreview({ recipe, saving, onConfirm, onRetry, onEdit }) {
   const c = CAT_COLOR[recipe.category] || "var(--soft)";
   return (
     <div>
@@ -1919,10 +2031,15 @@ function RecipePreview({ recipe, saving, onConfirm, onRetry }) {
         </div>
       </div>
 
-      <div className="rb-row" style={{ gap: 10, marginTop: 14 }}>
+      <div className="rb-row" style={{ gap: 10, marginTop: 14, flexWrap: "wrap" }}>
         <button className="rb-btn" style={{ flex: 1, justifyContent: "center" }} onClick={onRetry} disabled={saving}>
           <RotateCcw size={15} /> 다시 가져오기
         </button>
+        {onEdit && (
+          <button className="rb-btn" style={{ flex: 1, justifyContent: "center" }} onClick={onEdit} disabled={saving}>
+            <Pencil size={14} /> 수정해서 등록
+          </button>
+        )}
         <button className="rb-btn acc" style={{ flex: 2, justifyContent: "center" }} onClick={onConfirm} disabled={saving}>
           {saving ? <><Loader2 size={15} className="rb-spin" /> 등록 중…</> : <><Check size={16} /> 등록하기</>}
         </button>
@@ -2014,7 +2131,8 @@ function ManualForm({ onSubmit, currentUserId, initial, submitLabel = "레시피
         id: s.id, title: s.title, content: s.content, timerSeconds: s.min ? Math.round(Number(s.min) * 60) : null,
       })),
     };
-    if (initial) {
+    if (initial && initial.id) {
+      // 기존 레시피 편집
       onSubmit({ ...initial, ...base, version: (initial.version || 1) + 1, updatedBy: currentUserId });
     } else {
       onSubmit({

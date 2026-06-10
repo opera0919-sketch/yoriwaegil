@@ -6,6 +6,12 @@
     <title>요리외길 채유나 — 레시피함</title>
     <meta name="description" content="가족이 함께 쓰는 공유 레시피 보관함" />
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍳</text></svg>" />
+    <!-- Pretendard: dynamic-subset(쓰는 글자 범위만 woff2 로드). JS 내 @import보다 훨씬 빨리 로드 시작됨 -->
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard-dynamic-subset.min.css"
+    />
   </head>
   <body style="margin:0">
     <div id="root"></div>
