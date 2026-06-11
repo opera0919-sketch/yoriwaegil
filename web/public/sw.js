@@ -2,7 +2,7 @@
    - 페이지(navigate): 네트워크 우선, 실패 시 캐시 (배포 직후에도 최신 유지)
    - 해시된 정적 자산·폰트 CDN: 캐시 우선 (파일명에 해시가 있어 불변)
    - Supabase API 호출은 가로채지 않음 (데이터 오프라인 폴백은 앱이 localStorage로 처리) */
-const CACHE = "rb-shell-v1";
+const CACHE = "rb-shell-v2"; // v2: 브랜드 아이콘 교체(동일 파일명 캐시 무효화)
 
 self.addEventListener("install", () => self.skipWaiting());
 

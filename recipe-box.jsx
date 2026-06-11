@@ -14,21 +14,22 @@ import {
 const CSS = `
 .rb * { box-sizing: border-box; }
 .rb {
-  --bg: #F9FAFB;
-  --card: #FFFFFF;
-  --ink: #191F28;
-  --soft: #8B95A1;
-  --accent: #3182F6;
-  --accent-d: #1A6EE0;
-  --danger: #F04452;
-  --line: #E5E8EB;
-  --gold: #F8C83A;
-  --accent-soft: #EBF2FF;
-  --muted: #F2F4F6;
-  --field: #F9FAFB;
-  --gold-bg: #FFFBE6;
-  --timer-bg: #F8FAFF;
-  --body: #4A5568;
+  /* "장인의 부엌" 팔레트 — 로고(한지·먹·낙관)에서 추출: 종이 #DFD0BF / 먹 #32281D / 도장 #993820 */
+  --bg: #F1E9DC;
+  --card: #FBF7EF;
+  --ink: #32281D;
+  --soft: #95876F;
+  --accent: #9C3B22;
+  --accent-d: #84301B;
+  --danger: #C24632;
+  --line: #E0D5C2;
+  --gold: #C99A2E;
+  --accent-soft: #F3E3DB;
+  --muted: #E9E0CF;
+  --field: #F6F0E4;
+  --gold-bg: #F4ECD7;
+  --timer-bg: #F6EFE2;
+  --body: #5C5142;
   --font: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-family: var(--font);
   color: var(--ink);
@@ -42,6 +43,12 @@ const CSS = `
 /* header */
 .rb-top { display:flex; align-items:center; justify-content:space-between; gap:16px;
   padding:24px 0 18px; border-bottom:1px solid var(--line); margin-bottom:22px; flex-wrap:wrap; }
+.rb-brand { display:flex; align-items:center; gap:12px; min-width:0; }
+.rb-brand img { width:46px; height:46px; border-radius:12px; flex:none;
+  box-shadow:0 2px 8px rgba(94,72,40,.2); }
+.rb-brand h1 { font-size:21px; margin:0; line-height:1.15; letter-spacing:-.3px; }
+.rb-brand .slogan { font-size:11px; color:var(--soft); letter-spacing:2.5px; }
+.rb-top-right { display:flex; align-items:center; gap:18px; flex-wrap:wrap; }
 .rb-user-btn { display:flex; align-items:center; gap:10px; cursor:pointer;
   padding:6px 14px 6px 6px; border-radius:999px; border:1.5px solid var(--line);
   background:var(--card); transition:.16s; user-select:none; }
@@ -65,7 +72,7 @@ const CSS = `
 /* search + filter */
 .rb-bar { display:flex; gap:10px; margin-bottom:18px; flex-wrap:wrap; }
 .rb-search { flex:1; min-width:200px; display:flex; align-items:center; gap:9px;
-  background:var(--card); box-shadow:0 2px 10px rgba(0,0,0,.08);
+  background:var(--card); box-shadow:0 2px 10px rgba(94,72,40,.12);
   border:none; border-radius:14px; padding:0 14px; }
 .rb-search input { border:0; outline:0; background:transparent; font-family:var(--font); font-size:14px;
   padding:13px 0; width:100%; color:var(--ink); }
@@ -83,10 +90,16 @@ const CSS = `
 .rb-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:16px; }
 .rb-card { background:var(--card); border:none; border-radius:16px; overflow:hidden;
   cursor:pointer; transition:.2s; display:flex; flex-direction:column;
-  box-shadow:0 2px 12px rgba(0,0,0,.06); animation:rb-up .5s both; }
-.rb-card:hover { transform:translateY(-3px); box-shadow:0 12px 28px rgba(0,0,0,.12); }
-.rb-thumb { width:100%; aspect-ratio:16/9; background:#F2F4F6; overflow:hidden; flex:none; }
-.rb-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+  box-shadow:0 2px 12px rgba(94,72,40,.09); animation:rb-up .5s both; }
+.rb-card:hover { transform:translateY(-3px); box-shadow:0 12px 28px rgba(94,72,40,.18); }
+/* 상세 화면 영상 썸네일 — 리스트는 썸네일 없이 컴팩트하게, 영상은 상세에서 */
+.rb-dthumb { display:block; position:relative; width:100%; aspect-ratio:16/9; border-radius:14px;
+  overflow:hidden; background:var(--muted); margin:2px 0 16px; }
+.rb-dthumb img { width:100%; height:100%; object-fit:cover; display:block; }
+.rb-dthumb .play { position:absolute; inset:0; display:grid; place-items:center; }
+.rb-dthumb .play i { width:54px; height:54px; border-radius:999px; background:rgba(43,33,22,.62);
+  color:#fff; display:grid; place-items:center; transition:.18s; }
+.rb-dthumb:hover .play i { background:var(--accent); transform:scale(1.07); }
 .rb-cbody { padding:16px 16px 12px; flex:1; display:flex; flex-direction:column; }
 .rb-ctop { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
 .rb-ctitle { font-size:18px; line-height:1.25; letter-spacing:-.3px; font-weight:700; }
@@ -123,12 +136,12 @@ const CSS = `
 .rb-fab { position:fixed; right:22px; bottom:32px; z-index:40;
   width:56px; height:56px; border-radius:999px;
   background:var(--accent); color:#fff; border:none;
-  box-shadow:0 6px 20px rgba(49,130,246,.45);
+  box-shadow:0 6px 20px rgba(156,59,34,.4);
   display:grid; place-items:center; cursor:pointer; transition:.18s; }
 .rb-fab:hover { background:var(--accent-d); transform:scale(1.06); }
 
 /* overlay / bottom sheet */
-.rb-ov { position:fixed; inset:0; z-index:50; background:rgba(25,31,40,.45);
+.rb-ov { position:fixed; inset:0; z-index:50; background:rgba(43,33,22,.5);
   backdrop-filter:blur(3px); display:flex; justify-content:center; align-items:flex-end;
   padding:0; animation:rb-fade .2s; }
 .rb-sheet { background:var(--card); border-radius:24px 24px 0 0; width:100%;
@@ -218,12 +231,6 @@ const CSS = `
 .rb-srcpill { display:inline-flex; align-items:center; gap:8px; background:var(--card);
   border:1.5px solid var(--line); border-radius:999px; padding:7px 8px 7px 13px; font-size:13px; }
 
-.rb-note { background:var(--muted); border-radius:13px; padding:13px; }
-.rb-other-notes { background:var(--muted); border-radius:12px; padding:12px 14px; margin-top:8px; }
-.rb-other-note-item { display:flex; gap:10px; align-items:flex-start; padding:8px 0;
-  border-bottom:1px solid rgba(0,0,0,.06); }
-.rb-other-note-item:last-child { border-bottom:none; }
-
 /* avatar */
 .rb-avatar { width:36px; height:36px; border-radius:999px;
   display:grid; place-items:center; font-size:18px;
@@ -244,9 +251,9 @@ const CSS = `
 
 /* select custom arrow (테두리 톤에 맞춘 회색) */
 .rb-sel { appearance:none; -webkit-appearance:none; -moz-appearance:none; padding-right:34px;
-  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%238B95A1' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2395876F' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
   background-repeat:no-repeat; background-position:right 12px center; cursor:pointer; }
-.rb-sel:focus { background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%233182F6' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+.rb-sel:focus { background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%239C3B22' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
   background-repeat:no-repeat; background-position:right 12px center; }
 
 /* comments */
@@ -276,10 +283,10 @@ const CSS = `
 /* toast */
 .rb-toaster { position:fixed; left:50%; bottom:28px; transform:translateX(-50%); z-index:80;
   display:flex; flex-direction:column; gap:8px; align-items:center; pointer-events:none; }
-.rb-toast { background:#191F28; color:#fff; padding:11px 18px; border-radius:999px;
+.rb-toast { background:#32281D; color:#F6F0E4; padding:11px 18px; border-radius:999px;
   font-size:13.5px; font-weight:600; box-shadow:0 6px 24px rgba(0,0,0,.25);
   display:flex; align-items:center; gap:8px; max-width:90vw; animation:rb-toast-in .22s both; }
-.rb-toast-act { background:none; border:none; color:#7CB1FF; font-weight:700; font-size:13px;
+.rb-toast-act { background:none; border:none; color:#F0A989; font-weight:700; font-size:13px;
   cursor:pointer; padding:0 2px; font-family:inherit; flex:none; }
 @keyframes rb-toast-in { from{opacity:0; transform:translateY(12px) scale(.96);} to{opacity:1; transform:none;} }
 
@@ -290,22 +297,24 @@ const CSS = `
 .rb-spin { animation:rb-spin 1s linear infinite; }
 @keyframes rb-spin { to{transform:rotate(360deg);} }
 
-/* 다크 모드 — 시스템 설정 따름 */
+/* 다크 모드 — 시스템 설정 따름 ("먹빛 밤": 따뜻한 차콜 + 한지빛 텍스트) */
 @media (prefers-color-scheme: dark) {
   .rb {
-    --bg: #101317;
-    --card: #1A1F27;
-    --ink: #E8ECF1;
-    --soft: #94A0AD;
-    --accent: #4B92F8;
-    --accent-d: #2F7DEB;
-    --line: #2A313B;
-    --accent-soft: #1B2C49;
-    --muted: #232A33;
-    --field: #12151A;
-    --gold-bg: #3A331C;
-    --timer-bg: #19202C;
-    --body: #AEB8C4;
+    --bg: #161310;
+    --card: #211C16;
+    --ink: #EAE1D2;
+    --soft: #A2937C;
+    --accent: #C8593C;
+    --accent-d: #B44830;
+    --danger: #D9604B;
+    --line: #362E23;
+    --gold: #D2A53F;
+    --accent-soft: #3B241A;
+    --muted: #2A241B;
+    --field: #131009;
+    --gold-bg: #383019;
+    --timer-bg: #261F16;
+    --body: #C2B6A2;
   }
   .rb-search { box-shadow:0 2px 10px rgba(0,0,0,.35); }
   .rb-card { box-shadow:0 2px 12px rgba(0,0,0,.3); }
@@ -319,12 +328,15 @@ const CSS = `
 /* ------------------------------------------------------------------ */
 const CATS = ["한식", "중식", "양식", "일식", "기타"];
 const CAT_COLOR = { 한식: "#BE4329", 중식: "#C98A2B", 양식: "#6F7A52", 일식: "#4A6C7A", 기타: "#8A6D8B" };
+/* 별점 색 — SVG fill 속성은 CSS var()를 못 받아 상수로 둔다 */
+const GOLD = "#C99A2E";
+const STAR_OFF = "#CBBFA8";
 const GROUPS = ["채소", "육류·해산물", "양념·소스", "기타"];
 const STORE_SHOP_CHECKED_KEY = "recipebox:v1:shopChecked";
 const STORE_SHOP_SERVINGS_KEY = "recipebox:v1:shopServings";
 const STORE_CACHE_KEY = "recipebox:v1:cache";
 
-const USER_COLORS = ["#3182F6","#F04452","#00B493","#F8971D","#8B5CF6","#EC4899","#14B8A6","#F59E0B"];
+const USER_COLORS = ["#9C3B22","#C98A2B","#6F7A52","#4A6C7A","#8A6D8B","#A4543F","#5B7161","#9C7A3C"];
 
 /* Supabase */
 const SUPABASE_URL = "https://fbkriifozbwuaoegmmcf.supabase.co";
@@ -974,14 +986,13 @@ export default function RecipeBox() {
     const logs = r.cookLogs || [];
     const idx = logs.findIndex((l) => l.userId === currentUserId);
     const rate = extra.rating ? { rating: extra.rating } : {};
-    const memo = extra.memo ? { memo: extra.memo } : {};
     let newLogs;
     if (idx >= 0) {
       newLogs = logs.map((l, i) =>
-        i === idx ? { ...l, count: l.count + 1, lastCookedAt: Date.now(), ...rate, ...memo } : l
+        i === idx ? { ...l, count: l.count + 1, lastCookedAt: Date.now(), ...rate } : l
       );
     } else {
-      newLogs = [...logs, { userId: currentUserId, count: 1, lastCookedAt: Date.now(), ...rate, ...memo }];
+      newLogs = [...logs, { userId: currentUserId, count: 1, lastCookedAt: Date.now(), ...rate }];
     }
     update(id, { cookLogs: newLogs, updatedBy: currentUserId });
     toast("조리 기록을 추가했어요 🍳");
@@ -1041,16 +1052,24 @@ export default function RecipeBox() {
               <div style={{ textAlign: "center", padding: 32, maxWidth: 480 }}>
                 <div style={{ fontSize: 36, marginBottom: 16 }}>⚠️</div>
                 <div style={{ fontWeight: 700, fontSize: 17, marginBottom: 10 }}>Supabase 연결 오류</div>
-                <div style={{ color: "#8B95A1", fontSize: 13.5, lineHeight: 1.7, marginBottom: 20 }}>{dbError}</div>
+                <div style={{ color: "var(--soft)", fontSize: 13.5, lineHeight: 1.7, marginBottom: 20 }}>{dbError}</div>
                 <div style={{ background: "var(--muted)", borderRadius: 12, padding: "14px 18px", textAlign: "left", fontSize: 13, lineHeight: 1.8 }}>
                   Supabase 대시보드에서 <b>recipes</b>·<b>app_users</b> 테이블의 RLS 정책을 확인하세요.<br />
-                  필요한 정책: 읽기는 <code style={{ fontSize: 12, color: "#3182F6" }}>anon</code> 허용,
-                  쓰기는 <code style={{ fontSize: 12, color: "#3182F6" }}>authenticated</code> 허용
+                  필요한 정책: 읽기는 <code style={{ fontSize: 12, color: "var(--accent)" }}>anon</code> 허용,
+                  쓰기는 <code style={{ fontSize: 12, color: "var(--accent)" }}>authenticated</code> 허용
                   (<code style={{ fontSize: 12 }}>supabase/migrations</code>의 RLS 마이그레이션 참고).
                 </div>
               </div>
             )
-            : <Loader2 className="rb-spin" />}
+            : (
+              <div style={{ textAlign: "center" }}>
+                <img src={`${import.meta.env.BASE_URL || "./"}icon-192.png`} alt="요리외길"
+                  style={{ width: 84, height: 84, borderRadius: 20, boxShadow: "0 4px 16px rgba(94,72,40,.22)", marginBottom: 18 }} />
+                <div style={{ display: "grid", placeItems: "center", color: "var(--soft)" }}>
+                  <Loader2 className="rb-spin" />
+                </div>
+              </div>
+            )}
         </div>
       </div>
     );
@@ -1061,21 +1080,30 @@ export default function RecipeBox() {
       <div className="rb-wrap">
         {/* header */}
         <header className="rb-top">
-          {currentUser ? (
-            <div className="rb-user-btn" onClick={() => setShowAccountMenu(true)}>
-              <UserAvatar user={currentUser} size={32} />
-              <b>{currentUser.name}</b>
-              <ChevronDown size={14} color="#8B95A1" />
+          <div className="rb-brand">
+            <img src={`${import.meta.env.BASE_URL || "./"}icon-192.png`} alt="요리외길 로고" />
+            <div>
+              <h1>요리외길</h1>
+              <span className="slogan">장인의 길을 걷다</span>
             </div>
-          ) : (
-            <button className="rb-btn acc" onClick={signIn}>
-              <LogIn size={15} /> 로그인
-            </button>
-          )}
-          <div className="rb-stats">
-            <div className="rb-stat"><b>{recipes.length}</b><span>저장한 레시피</span></div>
-            <div className="rb-stat"><b>{triedCount}</b><span>만들어 본 요리</span></div>
-            <div className="rb-stat"><b>{cartRecipes.length}</b><span>장보기 담음</span></div>
+          </div>
+          <div className="rb-top-right">
+            <div className="rb-stats">
+              <div className="rb-stat"><b>{recipes.length}</b><span>저장한 레시피</span></div>
+              <div className="rb-stat"><b>{triedCount}</b><span>만들어 본 요리</span></div>
+              <div className="rb-stat"><b>{cartRecipes.length}</b><span>장보기 담음</span></div>
+            </div>
+            {currentUser ? (
+              <div className="rb-user-btn" onClick={() => setShowAccountMenu(true)}>
+                <UserAvatar user={currentUser} size={32} />
+                <b>{currentUser.name}</b>
+                <ChevronDown size={14} style={{ color: "var(--soft)" }} />
+              </div>
+            ) : (
+              <button className="rb-btn acc" onClick={signIn}>
+                <LogIn size={15} /> 로그인
+              </button>
+            )}
           </div>
         </header>
 
@@ -1094,15 +1122,15 @@ export default function RecipeBox() {
           <>
             <div className="rb-bar" style={{ flexWrap: "nowrap" }}>
               <div className="rb-search" style={{ flex: "1 1 auto", minWidth: 100 }}>
-                <Search size={17} color="#8B95A1" />
+                <Search size={17} style={{ color: "var(--soft)" }} />
                 <input placeholder="요리·재료·태그 검색…" value={q} onChange={(e) => setQ(e.target.value)} />
-                {q && <X size={16} style={{ cursor: "pointer", color: "#8B95A1" }} onClick={() => setQ("")} />}
+                {q && <X size={16} style={{ cursor: "pointer", color: "var(--soft)" }} onClick={() => setQ("")} />}
               </div>
               <button className="rb-ico" title={favOnly ? "전체 보기" : "즐겨찾기만 보기"}
                 onClick={() => setFavOnly((v) => !v)}
                 style={{ flex: "none", width: 42, height: 42,
                   ...(favOnly ? { borderColor: "var(--gold)", color: "var(--gold)", background: "var(--gold-bg)" } : {}) }}>
-                <Star size={17} fill={favOnly ? "#F8C83A" : "none"} />
+                <Star size={17} fill={favOnly ? GOLD : "none"} />
               </button>
               <select className="rb-sel" value={sort} onChange={(e) => setSort(e.target.value)}
                 style={{ width: 116, flex: "none" }}>
@@ -1114,7 +1142,7 @@ export default function RecipeBox() {
             <div className="rb-cats-scroll">
               <button
                 className={`rb-cat ${cat === "all" ? "on" : ""}`}
-                style={cat === "all" ? { background: "#191F28" } : {}}
+                style={cat === "all" ? { background: "#32281D" } : {}}
                 onClick={() => setCat("all")}
               >
                 전체 <span style={{ opacity: .6 }}>{recipes.length}</span>
@@ -1141,17 +1169,10 @@ export default function RecipeBox() {
                   const tried = r.cookLogs?.some((l) => l.userId === currentUserId && l.count > 0);
                   const myLog = r.cookLogs?.find((l) => l.userId === currentUserId);
                   const creator = users.find((u) => u.id === r.createdBy);
-                  const thumb = youtubeThumb(r.sourceUrl);
                   return (
                     <article key={r.id} className="rb-card"
                       style={{ animationDelay: q ? "0s" : `${Math.min(i * 0.04, 0.5)}s` }}
                       onClick={() => navigate(`#/recipe/${r.id}`)}>
-                      {thumb && (
-                        <div className="rb-thumb">
-                          <img src={thumb} alt="" loading="lazy"
-                            onError={(e) => { e.currentTarget.parentElement.style.display = "none"; }} />
-                        </div>
-                      )}
                       <div className="rb-cbody">
                         <div className="rb-ctop">
                           <div style={{ flex: 1 }}>
@@ -1165,7 +1186,7 @@ export default function RecipeBox() {
                             className={`rb-ico ${isFav ? "on" : ""}`}
                             aria-label={isFav ? "즐겨찾기 해제" : "즐겨찾기"}
                             onClick={(e) => { e.stopPropagation(); toggleFav(r); }}>
-                            <Star size={16} fill={isFav ? "#F8C83A" : "none"} />
+                            <Star size={16} fill={isFav ? GOLD : "none"} />
                           </button>
                         </div>
                         <div className="rb-cdesc">{r.description}</div>
@@ -1200,8 +1221,8 @@ export default function RecipeBox() {
                             <div style={{ display: "flex", gap: 1 }} title="별점">
                               {[1, 2, 3, 4, 5].map((n) => (
                                 <Star key={n} size={15} style={{ cursor: "pointer" }}
-                                  fill={n <= (myLog?.rating || 0) ? "#F8C83A" : "none"}
-                                  color={n <= (myLog?.rating || 0) ? "#F8C83A" : "#D0D5DD"}
+                                  fill={n <= (myLog?.rating || 0) ? GOLD : "none"}
+                                  color={n <= (myLog?.rating || 0) ? GOLD : STAR_OFF}
                                   onClick={() => { if (!requireLogin()) return; update(r.id, {
                                     cookLogs: (r.cookLogs || []).map((l) =>
                                       l.userId === currentUserId ? { ...l, rating: n } : l),
@@ -1267,7 +1288,7 @@ export default function RecipeBox() {
           r={cookRecipe} timers={timers}
           startTimer={startTimer} pauseTimer={pauseTimer} resetTimer={resetTimer}
           onClose={closeTop}
-          onFinish={(rating, memo) => { markCooked(cookRecipe.id, { rating, memo }); closeTop(); }}
+          onFinish={(rating) => { markCooked(cookRecipe.id, { rating }); closeTop(); }}
         />
       )}
 
@@ -1326,6 +1347,7 @@ function Detail({ r, timers, startTimer, pauseTimer, resetTimer, onClose, update
   const isFav = r.favorites?.includes(currentUserId);
   const inCart = r.inCartBy?.includes(currentUserId);
   const myLog = r.cookLogs?.find((l) => l.userId === currentUserId);
+  const thumb = youtubeThumb(r.sourceUrl);
 
   const grouped = useMemo(() => {
     const g = {}; r.ingredients.forEach((i) => (g[i.group || "기타"] = g[i.group || "기타"] || []).push(i)); return g;
@@ -1369,13 +1391,20 @@ function Detail({ r, timers, startTimer, pauseTimer, resetTimer, onClose, update
               className={`rb-ico ${isFav ? "on" : ""}`}
               aria-label={isFav ? "즐겨찾기 해제" : "즐겨찾기"}
               onClick={() => toggleFav(r)}>
-              <Star size={16} fill={isFav ? "#F8C83A" : "none"} />
+              <Star size={16} fill={isFav ? GOLD : "none"} />
             </button>
             <button className="rb-ico" aria-label="닫기" onClick={onClose}><X size={17} /></button>
           </div>
         </div>
 
         <div className="rb-sh-body">
+          {thumb && (
+            <a className="rb-dthumb" href={r.sourceUrl} target="_blank" rel="noopener noreferrer" title="원본 영상 보기">
+              <img src={thumb} alt=""
+                onError={(e) => { e.currentTarget.parentElement.style.display = "none"; }} />
+              <span className="play"><i><Play size={22} fill="#fff" /></i></span>
+            </a>
+          )}
           <p style={{ color: "var(--soft)", fontSize: 14, lineHeight: 1.6, marginTop: 0, marginBottom: 4 }}>{r.description}</p>
           {r.sourceUrl && (
             <a className="rb-citation" href={r.sourceUrl} target="_blank" rel="noopener noreferrer">
@@ -1399,11 +1428,10 @@ function Detail({ r, timers, startTimer, pauseTimer, resetTimer, onClose, update
               <span style={{ display: "flex", gap: 1 }}>
                 {[1, 2, 3, 4, 5].map((n) => (
                   <Star key={n} size={15}
-                    fill={n <= myLog.rating ? "#F8C83A" : "none"}
-                    color={n <= myLog.rating ? "#F8C83A" : "#D0D5DD"} />
+                    fill={n <= myLog.rating ? GOLD : "none"}
+                    color={n <= myLog.rating ? GOLD : STAR_OFF} />
                 ))}
               </span>
-              {myLog.memo && <span style={{ color: "var(--soft)" }}>“{myLog.memo}”</span>}
             </div>
           )}
 
@@ -1464,9 +1492,6 @@ function Detail({ r, timers, startTimer, pauseTimer, resetTimer, onClose, update
             );
           })}
 
-          {/* notes */}
-          <NoteSection r={r} users={users} currentUserId={currentUserId} update={update} requireLogin={requireLogin} />
-
           {/* comments */}
           <CommentSection r={r} users={users} currentUserId={currentUserId} update={update} requireLogin={requireLogin} />
 
@@ -1479,58 +1504,6 @@ function Detail({ r, timers, startTimer, pauseTimer, resetTimer, onClose, update
         </div>
       </div>
     </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/*  NOTE SECTION — 나만의 메모(간 조절·다음번 팁) + 가족 메모 보기       */
-/* ------------------------------------------------------------------ */
-function NoteSection({ r, users, currentUserId, update, requireLogin }) {
-  const myNote = (r.notes || {})[currentUserId] || "";
-  const [text, setText] = useState(myNote);
-  const dirty = text.trim() !== myNote.trim();
-
-  const save = () => {
-    if (!requireLogin()) return;
-    update(r.id, { notes: { ...(r.notes || {}), [currentUserId]: text.trim() }, updatedBy: currentUserId });
-    toast("메모를 저장했어요");
-  };
-
-  const others = Object.entries(r.notes || {})
-    .filter(([uid2, v]) => uid2 !== currentUserId && v && v.trim())
-    .map(([uid2, v]) => ({ user: users.find((u) => u.id === uid2), text: v }));
-
-  if (!currentUserId && others.length === 0) return null;
-
-  return (
-    <>
-      <div className="rb-sec-h"><Pencil size={15} /> 메모</div>
-      {currentUserId && (
-        <div className="rb-note">
-          <textarea className="rb-ta" value={text} onChange={(e) => setText(e.target.value)}
-            placeholder="나만 보는 건 아니지만, 나를 위한 메모 — 간 조절·다음번 팁 등"
-            style={{ minHeight: 60, background: "var(--card)" }} />
-          {dirty && (
-            <button className="rb-btn acc" style={{ marginTop: 8 }} onClick={save}>
-              <Check size={14} /> 메모 저장
-            </button>
-          )}
-        </div>
-      )}
-      {others.length > 0 && (
-        <div className="rb-other-notes">
-          {others.map((o, idx) => (
-            <div key={idx} className="rb-other-note-item">
-              <UserAvatar user={o.user || { emoji: "🧑" }} size={24} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 11.5, fontWeight: 700, marginBottom: 2 }}>{o.user?.name || "가족"}</div>
-                <div style={{ fontSize: 13, lineHeight: 1.55, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{o.text}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </>
   );
 }
 
@@ -1613,7 +1586,6 @@ function CookMode({ r, timers, startTimer, pauseTimer, resetTimer, onClose, onFi
   const [i, setI] = useState(0);
   const [finishing, setFinishing] = useState(false);
   const [rating, setRating] = useState(0);
-  const [memo, setMemo] = useState("");
 
   /* 요리 중 화면 꺼짐 방지 (Wake Lock — 미지원 브라우저는 조용히 무시) */
   useEffect(() => {
@@ -1653,14 +1625,14 @@ function CookMode({ r, timers, startTimer, pauseTimer, resetTimer, onClose, onFi
             <div style={{ display: "flex", gap: 6, margin: "10px 0 18px" }}>
               {[1, 2, 3, 4, 5].map((n) => (
                 <Star key={n} size={38} style={{ cursor: "pointer" }}
-                  fill={n <= rating ? "#F8C83A" : "none"}
-                  color={n <= rating ? "#F8C83A" : "#D0D5DD"}
+                  fill={n <= rating ? GOLD : "none"}
+                  color={n <= rating ? GOLD : STAR_OFF}
                   onClick={() => setRating(n)} />
               ))}
             </div>
-            <textarea className="rb-ta" value={memo} onChange={(e) => setMemo(e.target.value)}
-              placeholder="한 줄 기록 (선택) — 간 조절, 가족 반응 등을 남겨두세요."
-              style={{ maxWidth: 420, minHeight: 80 }} />
+            <div style={{ fontSize: 13.5, color: "var(--soft)", lineHeight: 1.6 }}>
+              남기고 싶은 이야기는 레시피 댓글로 적어주세요.
+            </div>
           </>
         ) : (
           <>
@@ -1694,7 +1666,7 @@ function CookMode({ r, timers, startTimer, pauseTimer, resetTimer, onClose, onFi
             <button className="rb-btn" onClick={() => setFinishing(false)}>
               <ChevronLeft size={16} /> 뒤로
             </button>
-            <button className="rb-btn acc" onClick={() => onFinish(rating, memo)}>
+            <button className="rb-btn acc" onClick={() => onFinish(rating)}>
               <Check size={16} /> 기록하고 완료
             </button>
           </>
