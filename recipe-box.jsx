@@ -15,7 +15,7 @@ const CSS = `
 .rb * { box-sizing: border-box; }
 .rb {
   /* "장인의 부엌" 팔레트 — 로고(한지·먹·낙관)에서 추출: 종이 #DFD0BF / 먹 #32281D / 도장 #993820 */
-  --bg: #F1E9DC;
+  --bg: #FAFAF8;
   --card: #FBF7EF;
   --ink: #32281D;
   --soft: #95876F;
@@ -43,12 +43,6 @@ const CSS = `
 /* header */
 .rb-top { display:flex; align-items:center; justify-content:space-between; gap:16px;
   padding:24px 0 18px; border-bottom:1px solid var(--line); margin-bottom:22px; flex-wrap:wrap; }
-.rb-brand { display:flex; align-items:center; gap:12px; min-width:0; }
-.rb-brand img { width:46px; height:46px; border-radius:12px; flex:none;
-  box-shadow:0 2px 8px rgba(94,72,40,.2); }
-.rb-brand h1 { font-size:21px; margin:0; line-height:1.15; letter-spacing:-.3px; }
-.rb-brand .slogan { font-size:11px; color:var(--soft); letter-spacing:2.5px; }
-.rb-top-right { display:flex; align-items:center; gap:18px; flex-wrap:wrap; }
 .rb-user-btn { display:flex; align-items:center; gap:10px; cursor:pointer;
   padding:6px 14px 6px 6px; border-radius:999px; border:1.5px solid var(--line);
   background:var(--card); transition:.16s; user-select:none; }
@@ -1080,31 +1074,22 @@ export default function RecipeBox() {
       <div className="rb-wrap">
         {/* header */}
         <header className="rb-top">
-          <div className="rb-brand">
-            <img src={`${import.meta.env.BASE_URL || "./"}icon-192.png`} alt="요리외길 로고" />
-            <div>
-              <h1>요리외길</h1>
-              <span className="slogan">장인의 길을 걷다</span>
-            </div>
+          <div className="rb-stats">
+            <div className="rb-stat"><b>{recipes.length}</b><span>저장한 레시피</span></div>
+            <div className="rb-stat"><b>{triedCount}</b><span>만들어 본 요리</span></div>
+            <div className="rb-stat"><b>{cartRecipes.length}</b><span>장보기 담음</span></div>
           </div>
-          <div className="rb-top-right">
-            <div className="rb-stats">
-              <div className="rb-stat"><b>{recipes.length}</b><span>저장한 레시피</span></div>
-              <div className="rb-stat"><b>{triedCount}</b><span>만들어 본 요리</span></div>
-              <div className="rb-stat"><b>{cartRecipes.length}</b><span>장보기 담음</span></div>
+          {currentUser ? (
+            <div className="rb-user-btn" onClick={() => setShowAccountMenu(true)}>
+              <UserAvatar user={currentUser} size={32} />
+              <b>{currentUser.name}</b>
+              <ChevronDown size={14} style={{ color: "var(--soft)" }} />
             </div>
-            {currentUser ? (
-              <div className="rb-user-btn" onClick={() => setShowAccountMenu(true)}>
-                <UserAvatar user={currentUser} size={32} />
-                <b>{currentUser.name}</b>
-                <ChevronDown size={14} style={{ color: "var(--soft)" }} />
-              </div>
-            ) : (
-              <button className="rb-btn acc" onClick={signIn}>
-                <LogIn size={15} /> 로그인
-              </button>
-            )}
-          </div>
+          ) : (
+            <button className="rb-btn acc" onClick={signIn}>
+              <LogIn size={15} /> 로그인
+            </button>
+          )}
         </header>
 
         {/* tabs */}
