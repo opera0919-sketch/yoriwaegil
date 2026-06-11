@@ -1838,7 +1838,7 @@ function AIImport({ onAdd, onEdit, currentUserId }) {
     setBusy(true); setErr("");
 
     const ctrl = new AbortController();
-    const timeout = setTimeout(() => ctrl.abort(), 90000); // 90초 타임아웃
+    const timeout = setTimeout(() => ctrl.abort(), 150000); // 150초 타임아웃(영상은 JSON→일반 모드 재시도로 길어질 수 있음)
     try {
       // 자막 추출·AI 호출은 Supabase Edge Function(import-recipe)에서 서버사이드로 처리.
       // 유튜브 링크면 영상을 분석해 레시피화하고, 그 외엔 검색 그라운딩을 사용한다.
@@ -2117,12 +2117,8 @@ function ManualForm({ onSubmit, currentUserId, initial, submitLabel = "레시피
       <div className="rb-field"><label className="rb-lab">태그 (쉼표로 구분)</label>
         <input className="rb-in" value={f.tags} onChange={(e) => set("tags", e.target.value)} placeholder="매운맛, 간단" /></div>
       {initial && (
-        <div className="rb-row" style={{ gap: 12 }}>
-          <div className="rb-field" style={{ flex: 2 }}><label className="rb-lab">출처 링크 (citation)</label>
-            <input className="rb-in" value={f.sourceUrl} onChange={(e) => set("sourceUrl", e.target.value)} placeholder="https://..." /></div>
-          <div className="rb-field" style={{ flex: 1 }}><label className="rb-lab">출처 제목</label>
-            <input className="rb-in" value={f.sourceTitle} onChange={(e) => set("sourceTitle", e.target.value)} placeholder="원문 제목" /></div>
-        </div>
+        <div className="rb-field"><label className="rb-lab">출처 링크 (citation)</label>
+          <input className="rb-in" value={f.sourceUrl} onChange={(e) => set("sourceUrl", e.target.value)} placeholder="https://..." /></div>
       )}
 
       <label className="rb-lab" style={{ marginTop: 6 }}>재료</label>

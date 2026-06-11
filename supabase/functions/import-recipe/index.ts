@@ -80,7 +80,7 @@ ${SCHEMA_RULES}`;
 
 // 유튜브 영상을 Gemini가 직접(화면+음성) 분석. 저해상도로 영상 토큰 절약(무료 플랜 한도 보호).
 // 1차: JSON 모드(responseMimeType)로 마크다운 펜스 없는 순수 JSON 응답 강제 → 클라이언트 파싱 실패율 감소.
-// JSON 모드가 거부되거나 오류면 일반 모드로 1회 재시도(기존 동작과 동일).
+// JSON 모드가 거부·오류이거나 응답이 비면 일반 모드로 1회 재시도(빈 응답을 분석불가로 오판하지 않게).
 async function callGeminiVideo(videoUrl: string) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
   const attempt = async (jsonMode: boolean) => {
@@ -113,12 +113,15 @@ async function callGeminiVideo(videoUrl: string) {
     const text: string = (cand?.content?.parts ?? []).map((p: { text?: string }) => p.text ?? "").join("\n");
     return text;
   };
+  // JSON 모드가 throw하거나 빈 응답이면 일반 모드로 재시도. 빈 응답을 곧장 분석불가로 처리하지 않는다.
   try {
-    return { text: await attempt(true) };
+    const t = await attempt(true);
+    if (t.trim()) return { text: t };
+    console.error("video JSON-mode returned empty, retrying plain");
   } catch (e) {
     console.error("video JSON-mode failed, retrying plain:", e);
-    return { text: await attempt(false) };
   }
+  return { text: await attempt(false) };
 }
 
 async function callGemini(sys: string, userText: string, useSearch: boolean) {
