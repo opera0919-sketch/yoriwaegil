@@ -16,17 +16,17 @@ const CSS = `
 .rb {
   /* "장인의 부엌" 팔레트 — 로고(한지·먹·낙관)에서 추출: 종이 #DFD0BF / 먹 #32281D / 도장 #993820 */
   --bg: #FAFAF8;
-  --card: #FBF7EF;
+  --card: #FFFFFF;
   --ink: #32281D;
   --soft: #95876F;
   --accent: #9C3B22;
   --accent-d: #84301B;
   --danger: #C24632;
-  --line: #E0D5C2;
+  --line: #E6E6E4;
   --gold: #C99A2E;
   --accent-soft: #F3E3DB;
-  --muted: #E9E0CF;
-  --field: #F6F0E4;
+  --muted: #F1F1EF;
+  --field: #F7F7F5;
   --gold-bg: #F4ECD7;
   --timer-bg: #F6EFE2;
   --body: #5C5142;
