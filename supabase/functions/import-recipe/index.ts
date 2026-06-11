@@ -143,7 +143,29 @@ async function callGemini(sys: string, userText: string, useSearch: boolean) {
   const text: string = (cand?.content?.parts ?? []).map((p: { text?: string }) => p.text ?? "").join("\n");
   const chunk = cand?.groundingMetadata?.groundingChunks?.find((c: { web?: { uri?: string } }) => c.web?.uri);
   const source = chunk ? { url: chunk.web.uri, title: chunk.web.title ?? "" } : { url: "", title: "" };
+  source.url = await resolveGroundingRedirect(source.url);
   return { text, source };
+}
+
+/* 그라운딩 인용 URL은 vertexaisearch 리다이렉트 주소라 시간이 지나면 만료되고,
+   유튜브 출처여도 영상 ID가 없어 클라이언트가 썸네일을 만들 수 없다.
+   → 리다이렉트를 따라가 최종 URL을 저장한다. 실패하면 원래 주소 그대로(기존 동작). */
+async function resolveGroundingRedirect(url: string): Promise<string> {
+  if (!url.startsWith("https://vertexaisearch.cloud.google.com/")) return url;
+  let cur = url;
+  try {
+    for (let i = 0; i < 3; i++) {
+      const res = await fetch(cur, { redirect: "manual", signal: AbortSignal.timeout(4000) });
+      await res.body?.cancel();
+      const loc = res.headers.get("location");
+      if (!loc) break;
+      cur = new URL(loc, cur).href;
+      if (!cur.startsWith("https://vertexaisearch.cloud.google.com/")) return cur;
+    }
+  } catch (e) {
+    console.error("grounding redirect resolve failed:", e);
+  }
+  return cur !== url ? cur : url;
 }
 
 /* ---------------- Handler ---------------- */
